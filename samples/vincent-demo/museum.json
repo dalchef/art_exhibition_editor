@@ -1,0 +1,113 @@
+{
+  "schemaVersion": 1,
+  "meta": {
+    "slug": "vincent-demo",
+    "title": "빈센트 — 사랑받고 싶었던 남자",
+    "subtitle": "파리에서 오베르까지",
+    "curator": "도슨트 정우철",
+    "intro": "고흐가 남긴 빛과 색의 여정. 밀밭의 사이프러스에서 자장가를 부르는 여인까지, 세 점의 그림으로 그의 마지막 나날을 걷습니다.",
+    "createdAt": "2026-07-05",
+    "language": "ko"
+  },
+  "avatarDefaults": { "preset": "capybara", "body": "default", "garment": "#8DA98A" },
+  "titleStyle": { "font": "serif", "weight": 700, "sizeCm": 28, "color": "#F2E9DB", "letterSpacing": 0.06, "lineHeight": 1.35 },
+  "introStyle": { "font": "sans", "weight": 400, "sizeCm": 9, "color": "#D9C9A8", "letterSpacing": 0.02, "lineHeight": 1.7 },
+  "titlePanel": { "align": "center", "bg": "none", "widthCm": 900, "light": { "on": true, "intensity": 1.3, "temp": "warm" } },
+  "lobby": {
+    "size": { "w": 18, "d": 12, "h": 8 },
+    "wall": { "preset": "gray", "pattern": false },
+    "floor": { "preset": "walnut-plank" },
+    "lighting": { "mood": "warm", "ambient": 0.85 },
+    "decor": { "chandelier": true, "columns": true, "cofferedCeiling": true, "goldTrim": true, "carpet": true },
+    "artworks": []
+  },
+  "route": ["aw-001", "aw-002", "aw-003"],
+  "rooms": [
+    {
+      "id": "room-1",
+      "name": "1. 사이프러스와 밀밭",
+      "intro": "생레미의 여름. 고흐는 요양원 창밖의 사이프러스와 물결치는 밀밭에서 격정을 발견했다.",
+      "size": { "w": 12, "d": 9, "h": 4.2 },
+      "wall": { "preset": "deep-red", "pattern": true },
+      "floor": { "preset": "walnut-herringbone" },
+      "lighting": { "mood": "warm", "ambient": 0.6 },
+      "decor": { "benches": true, "spotlights": true },
+      "exitDoor": { "wall": "north", "offset": 6.0 },
+      "artworks": [
+        {
+          "id": "aw-001",
+          "image": "assets/artworks/aw-001.jpg",
+          "thumb": "assets/thumbs/aw-001.jpg",
+          "caption": {
+            "title": "사이프러스가 있는 밀밭",
+            "artist": "빈센트 반 고흐",
+            "year": "1889",
+            "medium": "캔버스에 유채",
+            "collection": "메트로폴리탄 미술관, 뉴욕",
+            "credit": "Public domain",
+            "sourceUrl": "https://www.metmuseum.org/art/collection/search/436535"
+          },
+          "sizeCm": { "w": 93.4, "h": 73.2 },
+          "scale": 1.0,
+          "placement": { "wall": "west", "x": 4.5, "centerHeightCm": 150 },
+          "frame": { "style": "gold", "matte": false, "matteColor": "#f3ead8" },
+          "light": { "intensity": 1.3, "temp": "warm" },
+          "docentNote": "여기서 사이프러스의 상징(죽음과 영원)으로 도입 — 비공개"
+        },
+        {
+          "id": "aw-002",
+          "image": "assets/artworks/aw-002.jpg",
+          "thumb": "assets/thumbs/aw-002.jpg",
+          "caption": {
+            "title": "라르레지엔: 마담 지누",
+            "artist": "빈센트 반 고흐",
+            "year": "1888–89",
+            "medium": "캔버스에 유채",
+            "collection": "메트로폴리탄 미술관, 뉴욕",
+            "credit": "Public domain",
+            "sourceUrl": "https://www.metmuseum.org/art/collection/search/436529"
+          },
+          "sizeCm": { "w": 73.7, "h": 91.4 },
+          "scale": 1.0,
+          "placement": { "wall": "east", "x": 4.5, "centerHeightCm": 150 },
+          "frame": { "style": "gold", "matte": true, "matteColor": "#f3ead8" },
+          "light": { "intensity": 1.2, "temp": "warm" },
+          "docentNote": "아를의 카페 주인 마담 지누. 고갱과의 우정 이야기로 연결 — 비공개"
+        }
+      ]
+    },
+    {
+      "id": "room-2",
+      "name": "2. 자장가",
+      "intro": "룰랭 부인을 그린 다섯 점의 '자장가' 연작. 고흐는 이 그림이 뱃사람의 선실에 걸려 위로가 되기를 바랐다.",
+      "size": { "w": 10, "d": 8, "h": 4.2 },
+      "wall": { "preset": "green", "pattern": true },
+      "floor": { "preset": "oak-herringbone" },
+      "lighting": { "mood": "warm", "ambient": 0.55 },
+      "decor": { "benches": true, "spotlights": true },
+      "exitDoor": null,
+      "artworks": [
+        {
+          "id": "aw-003",
+          "image": "assets/artworks/aw-003.jpg",
+          "thumb": "assets/thumbs/aw-003.jpg",
+          "caption": {
+            "title": "라 베르쇠즈 (자장가)",
+            "artist": "빈센트 반 고흐",
+            "year": "1889",
+            "medium": "캔버스에 유채",
+            "collection": "메트로폴리탄 미술관, 뉴욕",
+            "credit": "Public domain",
+            "sourceUrl": "https://www.metmuseum.org/art/collection/search/437984"
+          },
+          "sizeCm": { "w": 73.7, "h": 92.7 },
+          "scale": 1.0,
+          "placement": { "wall": "north", "x": 5.0, "centerHeightCm": 150 },
+          "frame": { "style": "wood", "matte": false, "matteColor": "#f3ead8" },
+          "light": { "intensity": 1.25, "temp": "warm" },
+          "docentNote": "연작의 배경 꽃무늬는 고흐가 상상한 벽지 — 비공개"
+        }
+      ]
+    }
+  ]
+}

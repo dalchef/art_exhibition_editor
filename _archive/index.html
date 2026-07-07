@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>사랑을 그리다 — 로코코의 연인들 | 정우철 미술관</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- Three.js 캔버스 -->
+<canvas id="c"></canvas>
+
+<!-- ── 상단 좌측 HUD ── -->
+<div id="hud">
+  <div class="title">🏛 정우철 미술관</div>
+  <div class="sub">사랑을 그리다 — 로코코의 연인들</div>
+  <span class="key">W A S D</span> 이동 &nbsp;
+  <span class="key">드래그</span> 시점<br>
+  <span class="key">스크롤</span> 줌 &nbsp;
+  <span class="key">Space</span> 모달 닫기
+</div>
+
+<!-- ── 상단 우측: 섹션 배지 ── -->
+<div id="section-badge">
+  <div class="sec-label" id="badge-sec-label">ENTRANCE</div>
+  <div class="sec-name"  id="badge-sec-name">사랑을 그리다</div>
+</div>
+
+<!-- ── 가상 조이스틱 (모바일) ── -->
+<div id="joystick-zone">
+  <div id="joystick-base"></div>
+  <div id="joystick-knob"></div>
+</div>
+
+<!-- ── 하단 작품 정보 바 ── -->
+<div id="info-bar">
+  <div class="inner">
+    <div style="flex:1">
+      <div class="approach">▶ 작품에 가까이 있습니다</div>
+      <div class="art-title"  id="ib-title"></div>
+      <div class="art-meta"   id="ib-meta"></div>
+      <div class="art-desc"   id="ib-desc"></div>
+      <div class="art-museum" id="ib-museum"></div>
+    </div>
+    <button id="view-btn" style="
+      flex-shrink:0;
+      background:rgba(201,168,76,0.18);
+      border:1.5px solid #c9a84c;
+      border-radius:6px;
+      padding:10px 18px;
+      color:#f0d080;
+      font-size:11px;
+      font-family:'Noto Serif KR',serif;
+      cursor:pointer;
+      pointer-events:all;
+      white-space:nowrap;
+    ">🔍 크게 보기</button>
+  </div>
+</div>
+
+<!-- ── 스페이스 힌트 ── -->
+<div id="space-hint">
+  <div class="sh-inner">SPACE — 상세 닫기</div>
+</div>
+
+<!-- ── 작품 상세 모달 ── -->
+<div id="modal">
+  <div id="modal-inner" onclick="event.stopPropagation()">
+    <div id="modal-img-wrap">
+      <img id="modal-img" src="" alt="">
+      <button id="modal-close">✕</button>
+    </div>
+    <div id="modal-label">
+      <div class="mt" id="ml-title"></div>
+      <div class="ms" id="ml-meta"></div>
+      <div class="md" id="ml-desc"></div>
+      <div class="mm" id="ml-museum"></div>
+      <div class="space-tip">[ SPACE ] 또는 ✕ 를 눌러 닫기</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── 스크립트 로드 순서 중요 ── -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<!-- 1. 전시 구조 데이터 -->
+<script src="data.js"></script>
+
+<!-- 2. 이미지 Base64 (가장 큰 파일, 마지막에 로드) -->
+<script src="data_imgs.js"></script>
+
+<!-- 3. 씬 & 방 구성 -->
+<script>
+// museum.js 인라인 (빌드 후 외부 파일로 분리 가능)
+</script>
+<script src="museum.js"></script>
+
+<!-- 4. 전시관 빌드 실행 -->
+<script>
+  buildMuseum();
+  buildCharacter();
+</script>
+
+<!-- 5. 인터랙션 (이동·카메라·모달) -->
+<script src="interaction.js"></script>
+
+</body>
+</html>

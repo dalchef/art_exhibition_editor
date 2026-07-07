@@ -1,0 +1,4 @@
+Pretendard 1.3.9 (vendored from jsdelivr 2026-07-05)
+File: PretendardVariable.woff2 (variable font, weights 45-920, full KR subset)
+License: SIL Open Font License 1.1 (OFL)
+Source: https://github.com/orioncactus/pretendard

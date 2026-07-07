@@ -1,0 +1,37 @@
+{
+  "comment": "Publish(export) 시 배포 번들에 복사할 엔진 파일 목록. exporter.js 가 이 목록을 읽는다. 경로 이중관리 방지.",
+  "engineVersion": 1,
+  "viewer": [
+    "viewer/index.html",
+    "viewer/css/viewer.css",
+    "viewer/js/main.js",
+    "viewer/js/world.js",
+    "viewer/js/textures.js",
+    "viewer/js/artwork.js",
+    "viewer/js/avatar.js",
+    "viewer/js/avatarPresets.js",
+    "viewer/js/controls.js",
+    "viewer/js/interact.js",
+    "viewer/js/hud.js",
+    "viewer/js/autowalk.js",
+    "viewer/js/editMode.js"
+  ],
+  "shared": [
+    "shared/schema.js",
+    "shared/placementRules.js"
+  ],
+  "vendor": [
+    "vendor/three.module.js",
+    "vendor/three.core.js",
+    "vendor/pretendard/PretendardVariable.woff2",
+    "vendor/noto-serif-kr/NotoSerifKR-400.woff2",
+    "vendor/noto-serif-kr/NotoSerifKR-700.woff2"
+  ],
+  "root": [
+    "NOTICE.md"
+  ],
+  "notes": {
+    "jszip": "에디터 전용(Publish ZIP 생성). 배포본에는 포함하지 않는다.",
+    "indexHtml": "배포본에서는 viewer/index.html 를 번들 루트 index.html 로 복사하고, 상대경로(../../vendor, ../../shared)를 배포 구조(./vendor, ./shared)에 맞게 재작성한다. exporter.js 참조."
+  }
+}

@@ -1,0 +1,159 @@
+/* ============================================================
+   style.css — 사랑을 그리다: 로코코의 연인들
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Noto+Serif+KR:wght@300;400;600&display=swap');
+
+:root {
+  --gold:        #c9a84c;
+  --gold-light:  #e8d4a0;
+  --gold-dark:   #8b6914;
+  --cream:       #f5efe6;
+  --bg:          #0e0a06;
+  --text-pale:   rgba(245,239,230,0.55);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  overflow: hidden;
+  font-family: 'Noto Serif KR', serif;
+  touch-action: none;
+  user-select: none;
+}
+
+#c { display: block; width: 100vw; height: 100vh; }
+
+/* ── HUD (상단 좌측) ── */
+#hud {
+  position: fixed; top: 12px; left: 12px; z-index: 20;
+  background: rgba(10,6,2,0.90);
+  border: 1.5px solid rgba(201,168,76,0.45);
+  border-radius: 10px;
+  padding: 10px 14px;
+  color: #f0e0a0; font-size: 11px; line-height: 2.0;
+  pointer-events: none;
+  transition: opacity 1.4s ease;
+}
+#hud.hidden { opacity: 0; }
+#hud .title { font-size: 13px; font-weight: 600; color: #f5e060; margin-bottom: 2px; }
+#hud .sub   { font-size: 9px; color: #a08040; margin-bottom: 5px; }
+#hud .key   {
+  background: rgba(255,200,80,0.08);
+  border: 1px solid rgba(201,168,76,0.35);
+  border-radius: 3px; padding: 1px 5px;
+  font-size: 9px; color: #f0d080;
+}
+
+/* ── 섹션 배지 (우측 상단) ── */
+#section-badge {
+  position: fixed; top: 12px; right: 12px; z-index: 20;
+  background: rgba(10,6,2,0.90);
+  border: 1.5px solid rgba(201,168,76,0.35);
+  border-radius: 10px;
+  padding: 8px 16px; text-align: right;
+  pointer-events: none;
+  transition: opacity 0.6s;
+}
+#section-badge .sec-label { font-family: 'Cormorant Garamond', serif; font-size: 9px; color: rgba(201,168,76,0.4); letter-spacing: 0.3em; }
+#section-badge .sec-name  { font-size: 14px; font-weight: 400; color: var(--gold-light); margin-top: 2px; }
+
+/* ── 가상 조이스틱 ── */
+#joystick-zone {
+  position: fixed; bottom: 28px; left: 28px;
+  width: 130px; height: 130px;
+  z-index: 50; touch-action: none;
+  display: none; /* 터치 기기에서만 표시 */
+}
+#joystick-base {
+  width: 130px; height: 130px; border-radius: 50%;
+  background: rgba(201,168,76,0.08);
+  border: 2px solid rgba(201,168,76,0.28);
+  position: absolute; top: 0; left: 0;
+}
+#joystick-knob {
+  width: 52px; height: 52px; border-radius: 50%;
+  background: rgba(201,168,76,0.45);
+  border: 2px solid rgba(240,210,100,0.6);
+  position: absolute; top: 39px; left: 39px;
+}
+
+/* ── 하단 정보 바 ── */
+#info-bar {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 40;
+  background: linear-gradient(to top, rgba(6,3,1,0.98) 60%, transparent);
+  padding: 12px 24px 20px;
+  display: none;
+  pointer-events: none;
+}
+#info-bar .inner {
+  max-width: 700px; margin: 0 auto;
+  display: flex; align-items: center; gap: 16px;
+}
+#info-bar .approach  { font-size: 9px; color: var(--gold); letter-spacing: 0.15em; margin-bottom: 3px; font-family: 'Cormorant Garamond', serif; }
+#info-bar .art-title { font-size: 18px; font-weight: 400; color: #f5e060; }
+#info-bar .art-meta  { font-size: 11px; color: #d0a858; margin-top: 2px; }
+#info-bar .art-desc  { font-size: 11px; color: #c8b880; line-height: 1.8; margin-top: 5px; max-width: 480px; }
+#info-bar .art-museum{ font-size: 9px; color: #806830; margin-top: 4px; font-family: 'Cormorant Garamond', serif; letter-spacing: 0.05em; }
+
+/* 스페이스바 힌트 */
+#space-hint {
+  position: fixed; bottom: 28px; right: 24px; z-index: 45;
+  display: none;
+  pointer-events: none;
+  animation: pulse-hint 2s ease-in-out infinite;
+}
+#space-hint .sh-inner {
+  background: rgba(10,6,2,0.85);
+  border: 1px solid rgba(201,168,76,0.4);
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 11px; color: var(--gold);
+  letter-spacing: 0.1em;
+}
+@keyframes pulse-hint {
+  0%,100% { opacity: 0.5; transform: translateY(0); }
+  50%      { opacity: 1;   transform: translateY(-3px); }
+}
+
+/* ── 모달 ── */
+#modal {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(3,1,0,0.96);
+  display: none; align-items: center; justify-content: center;
+  backdrop-filter: blur(4px);
+}
+#modal-inner {
+  max-width: 94vw; max-height: 94vh;
+  display: flex; flex-direction: column; align-items: center; gap: 16px;
+  animation: modal-in 0.25s cubic-bezier(0.22,1,0.36,1);
+}
+@keyframes modal-in { from { transform: scale(0.88); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+#modal-img-wrap { position: relative; }
+#modal-img {
+  display: block;
+  max-width: 90vw; max-height: 65vh;
+  object-fit: contain;
+  border: 3px solid var(--gold);
+  box-shadow: 0 0 80px rgba(201,168,76,0.25), 0 0 20px rgba(0,0,0,0.8);
+}
+#modal-close {
+  position: absolute; top: -14px; right: -14px;
+  width: 30px; height: 30px; border-radius: 50%;
+  background: var(--gold); color: #0a0600;
+  font-size: 13px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; border: none; z-index: 101;
+  transition: transform 0.2s;
+}
+#modal-close:hover { transform: scale(1.15); }
+
+#modal-label { text-align: center; padding: 0 16px; }
+#modal-label .mt { font-size: 22px; font-weight: 300; color: #f5e060; margin-bottom: 4px; font-family: 'Noto Serif KR', serif; }
+#modal-label .ms { font-size: 12px; color: #d0a858; margin-bottom: 8px; font-family: 'Cormorant Garamond', serif; letter-spacing: 0.05em; }
+#modal-label .md { font-size: 12px; color: #c0b07a; max-width: 580px; line-height: 1.9; }
+#modal-label .mm { font-size: 10px; color: #806830; margin-top: 8px; font-family: 'Cormorant Garamond', serif; }
+#modal-label .space-tip { font-size: 10px; color: rgba(201,168,76,0.4); margin-top: 10px; letter-spacing: 0.1em; }

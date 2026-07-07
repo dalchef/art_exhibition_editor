@@ -1,0 +1,6 @@
+Noto Serif KR — korean subset woff2, weights 400/700
+Vendored from fontsource CDN 2026-07-06:
+  https://cdn.jsdelivr.net/fontsource/fonts/noto-serif-kr@latest/korean-400-normal.woff2
+  https://cdn.jsdelivr.net/fontsource/fonts/noto-serif-kr@latest/korean-700-normal.woff2
+License: SIL Open Font License 1.1
+Source: https://fonts.google.com/noto/specimen/Noto+Serif+KR (© Google / Adobe)

@@ -1,0 +1,4 @@
+three.js r0.185.1 (vendored from unpkg 2026-07-05)
+Files: three.module.js + three.core.js (module entry imports from core; both required)
+License: MIT
+Source: https://unpkg.com/three@0.185.1/build/

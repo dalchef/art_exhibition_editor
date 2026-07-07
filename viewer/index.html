@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>온라인 미술관</title>
+<link rel="stylesheet" href="css/viewer.css">
+</head>
+<body>
+  <canvas id="scene"></canvas>
+
+  <!-- 로딩 화면 -->
+  <div id="loading" class="overlay">
+    <div class="load-title" id="load-title">미술관을 준비하는 중…</div>
+    <div class="load-bar"><div class="load-fill" id="load-fill"></div></div>
+    <div class="load-pct" id="load-pct">0%</div>
+  </div>
+
+  <!-- HUD 루트 (hud.js 가 채움) -->
+  <div id="hud"></div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
