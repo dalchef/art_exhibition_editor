@@ -16,6 +16,16 @@
   font-weight: 700; font-display: swap;
 }
 
+@font-face {
+  font-family: 'Noto Sans KR';
+  src: url('../../vendor/noto-sans-kr/NotoSansKR-400.woff2') format('woff2');
+  font-weight: 400; font-display: swap;
+}
+@font-face {
+  font-family: 'Noto Sans KR';
+  src: url('../../vendor/noto-sans-kr/NotoSansKR-700.woff2') format('woff2');
+  font-weight: 700; font-display: swap;
+}
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { width: 100%; height: 100%; overflow: hidden; background: #14100e; }
 body { font-family: 'Pretendard', system-ui, -apple-system, sans-serif; -webkit-user-select: none; user-select: none; touch-action: none; }
@@ -85,6 +95,13 @@ canvas#scene { display: block; width: 100%; height: 100%; }
   font-family: inherit;
 }
 .zoom-tools button.active { background: rgba(201,162,76,.28); color: #f0d080; }
+
+/* P5: 터치 기기 — 닫기/프롬프트 터치 영역 확대 */
+@media (pointer: coarse) {
+  .zoom-tools { top: max(16px, env(safe-area-inset-top, 16px)); gap: 12px; }
+  .zoom-tools button { padding: 14px 22px; font-size: 15px; border-radius: 12px; }
+  .zoom-prompt { padding: 14px 26px; font-size: 16px; }
+}
 
 /* H 토글: HUD 전체 숨김 (녹화 모드) */
 #hud.hidden { display: none; }

@@ -1,6 +1,6 @@
 // viewer/js/main.js — 뷰어 진입점: 데이터 로드 → 월드 빌드 → 렌더 루프.
 import * as THREE from '../../vendor/three.module.js';
-import { computeLayout, validateProject, ensureLobby, ensureTextStyles, normalizeSurfaces } from '../../shared/schema.js';
+import { computeLayout, validateProject, ensureLobby, ensureTextStyles, normalizeSurfaces, ensureOrigins, ensureTexts } from '../../shared/schema.js';
 import { buildWorld } from './world.js';
 import { buildArtworks } from './artwork.js';
 import { makeAvatar } from './avatar.js';
@@ -8,9 +8,14 @@ import { PlayerControls } from './controls.js';
 import { Interactions } from './interact.js';
 import { HUD } from './hud.js';
 import { AutoWalk } from './autowalk.js';
+import { AVATAR_PRESETS, LEGACY_PRESET_MAP } from './avatarPresets.js';
 
 const params = new URLSearchParams(location.search);
 const DEBUG_CAM = params.get('cam') === 'orbit' || params.get('debugcam') === '1';
+// P1(v1.3) 임베드 모드: 캐릭터 선택을 건너뛰고 즉시 갤러리 진입 (에디터 스플릿 프리뷰용).
+// URL 파라미터가 없으면 절대 활성화되지 않음 → 퍼블리시 결과물의 시작 흐름에 영향 없음.
+const EMBED = params.get('embed') === '1';
+const SKIP_INTRO = EMBED || params.get('skipIntro') === '1';
 
 const el = {
   canvas: document.getElementById('scene'),
@@ -42,14 +47,31 @@ async function loadData() {
 
 function loadFromPreview() {
   return new Promise((resolve) => {
-    // 부모 창(같은 출처의 에디터)에 준비 신호를 보내고 데이터 수신 대기
+    // 부모 창(같은 출처의 에디터)에 준비 신호를 보내고 데이터 수신 대기.
+    // window.open(팝업) = opener, iframe 임베드(P1) = parent.
     window.addEventListener('message', (e) => {
       if (e.origin === location.origin && e.data && e.data.type === 'museum-preview-data') {
         resolve({ project: e.data.project, baseDir: '', blobs: e.data.blobs || null });
       }
     });
-    if (window.opener) window.opener.postMessage({ type: 'museum-preview-ready' }, location.origin);
+    const host = window.opener || (window.parent !== window ? window.parent : null);
+    if (host) host.postMessage({ type: 'museum-preview-ready' }, location.origin);
   });
+}
+
+// 임베드(skipIntro) 진입용 아바타: 마지막 선택(localStorage) → 프로젝트 기본값 → 폴백.
+// HUD 의 초기 선택 로직과 동일한 정규화 (구 a1~a4 프리셋 매핑 포함).
+function resolveEmbedAvatar(project) {
+  let last = null;
+  try { last = JSON.parse(localStorage.getItem('museum-avatar-last') || 'null'); } catch (e) { /* 무시 */ }
+  const av = last || project.avatarDefaults || {};
+  const preset = AVATAR_PRESETS[av.preset] ? av.preset : (LEGACY_PRESET_MAP[av.preset] || 'capybara');
+  return {
+    preset,
+    body: AVATAR_PRESETS[preset].bodies[av.body] ? av.body : 'default',
+    garment: (typeof av.garment === 'string' && av.garment.startsWith('#')) ? av.garment
+      : AVATAR_PRESETS[preset].garmentDefault,
+  };
 }
 
 // 이미지 경로 → 실제 URL (프리뷰면 blob, 아니면 baseDir 상대)
@@ -69,6 +91,8 @@ async function ensureFont() {
       document.fonts.load('500 24px Pretendard'),
       document.fonts.load(`700 40px 'Noto Serif KR'`),
       document.fonts.load(`400 24px 'Noto Serif KR'`),
+      document.fonts.load(`700 40px 'Noto Sans KR'`),
+      document.fonts.load(`400 24px 'Noto Sans KR'`),
     ]);
     await document.fonts.ready;
   } catch (e) { /* 폴백폰트로 진행 */ }
@@ -79,6 +103,8 @@ function normalizeProject(project) {
   ensureLobby(project);
   ensureTextStyles(project);
   normalizeSurfaces(project);
+  ensureOrigins(project); // P2: 레거시 체인 배치 → origin
+  ensureTexts(project);   // P4: 고정 타이틀월/섹션 패널 → 자유 배치 텍스트 오브젝트
   return project;
 }
 
@@ -88,6 +114,10 @@ async function preloadPatterns(project, ctx) {
   const scan = (r) => {
     if (r?.wall?.pattern === 'custom' && r.wall.patternAsset) keys.add(r.wall.patternAsset);
     if (r?.floor?.preset === 'custom' && r.floor.asset) keys.add(r.floor.asset);
+    // P3: 면 단위 오버라이드의 커스텀 패턴
+    for (const f of Object.values(r?.wallFaces || {})) {
+      if (f?.pattern === 'custom' && f.patternAsset) keys.add(f.patternAsset);
+    }
   };
   for (const r of (project.rooms || [])) scan(r);
   scan(project.lobby);
@@ -209,33 +239,39 @@ async function boot() {
 
   let controls = null, interactions = null, orbit = null, avatar = null, hud = null, autowalk = null, editMode = null;
   const EDIT = params.get('preview') === '1' && params.get('edit') === '1' && !isMobile; // P2 (데스크톱 전용)
+
+  // 갤러리 입장 (캐릭터 선택 후 / skipIntro 즉시) — HUD onEnter 와 임베드 진입 공용
+  const enterGallery = (opts) => {
+    avatar = makeAvatar(opts);
+    scene.add(avatar);
+    // 임베드 프리뷰(P1): 스폰을 로비 안쪽으로 당겨 3인칭 카메라 풀백 공간 확보
+    // (스폰 지점은 남쪽 벽 0.8m 앞이라 즉시 입장 시 카메라가 아바타에 밀착됨)
+    const spawnZ = SKIP_INTRO ? Math.max(1.5, layout.spawn.z - 2.2) : layout.spawn.z;
+    controls = new PlayerControls(avatar, camera, world.colliders, renderer.domElement, {
+      spawnX: layout.spawn.x, spawnZ,
+    });
+    interactions = new Interactions(controls, arts.anchors, document.getElementById('hud'));
+    hud?.attachControls(controls);
+    const dwell = parseFloat(params.get('dwell')) || 4;
+    autowalk = new AutoWalk(controls, arts.anchors, layout, project, { dwell });
+    window.addEventListener('keydown', (e) => { if (e.key.toLowerCase() === 'p' && !interactions.isOpen) autowalk.toggle(); });
+    window.__museum.controls = controls;
+    window.__museum.interactions = interactions;
+    window.__museum.avatar = avatar;
+    window.__museum.autowalk = autowalk;
+  };
+
   if (DEBUG_CAM) {
     orbit = attachOrbit(camera, renderer.domElement, target);
   } else if (EDIT) {
     // 3D 편집 프리뷰 (P2): 시작 화면 없이 자유 비행 카메라 + 편집 오버레이 (아래에서 생성)
+  } else if (SKIP_INTRO) {
+    // P1 임베드: 캐릭터 선택 화면 생략, 아바타로 즉시 입장 (아래 window.__museum 이후 호출)
   } else {
     // 시작 화면 동안: 로비 스폰에서 타이틀월(북쪽)을 바라보는 오프닝 샷
     camera.position.set(layout.spawn.x, 1.5, layout.spawn.z);
     camera.lookAt(layout.spawn.x, 1.5, layout.spawn.z - 6);
-    hud = new HUD(project, {
-      isMobile,
-      onEnter: (opts) => {
-        avatar = makeAvatar(opts);
-        scene.add(avatar);
-        controls = new PlayerControls(avatar, camera, world.colliders, renderer.domElement, {
-          spawnX: layout.spawn.x, spawnZ: layout.spawn.z,
-        });
-        interactions = new Interactions(controls, arts.anchors, document.getElementById('hud'));
-        hud.attachControls(controls);
-        const dwell = parseFloat(params.get('dwell')) || 4;
-        autowalk = new AutoWalk(controls, arts.anchors, layout, project, { dwell });
-        window.addEventListener('keydown', (e) => { if (e.key.toLowerCase() === 'p' && !interactions.isOpen) autowalk.toggle(); });
-        window.__museum.controls = controls;
-        window.__museum.interactions = interactions;
-        window.__museum.avatar = avatar;
-        window.__museum.autowalk = autowalk;
-      },
-    });
+    hud = new HUD(project, { isMobile, onEnter: enterGallery });
   }
 
   window.__museum = { scene, camera, renderer, project, layout, world, arts, ctx, controls, interactions, avatar, hud };
@@ -246,6 +282,8 @@ async function boot() {
       onMessage: (msg) => window.opener?.postMessage(msg, location.origin),
     });
     window.__museum.editMode = editMode;
+  } else if (!DEBUG_CAM && SKIP_INTRO) {
+    enterGallery(resolveEmbedAvatar(project));
   }
 
   // ---- 프리뷰 라이브 리빌드 (v1.2): 에디터가 재전송한 프로젝트를 즉시 반영 ----
@@ -284,8 +322,12 @@ async function boot() {
   window.__museum.rebuild = rebuild;
   if (params.get('preview') === '1') {
     window.addEventListener('message', (e) => {
-      if (e.origin === location.origin && e.data && e.data.type === 'museum-preview-data' && window.__museum.ready) {
+      if (e.origin !== location.origin || !e.data) return;
+      if (e.data.type === 'museum-preview-data' && window.__museum.ready) {
         rebuild(e.data.project, e.data.blobs);
+      } else if (e.data.type === 'museum-preview-pause') {
+        // P1: 프리뷰 패널 접힘 → 렌더 루프 일시정지 / 펼침 → 재개
+        window.__museum.setPaused?.(!!e.data.paused);
       }
     });
   }
@@ -301,8 +343,15 @@ async function boot() {
   });
 
   let lastRoom = -1;
+  let paused = false;
   const timer = new THREE.Timer();
+  window.__museum.setPaused = (p) => {
+    if (paused === !!p) return;
+    paused = !!p;
+    if (!paused) { timer.update(); animate(); } // 재개: dt 리셋 후 루프 재시작
+  };
   function animate() {
+    if (paused) return;
     requestAnimationFrame(animate);
     timer.update();
     const dt = Math.min(timer.getDelta(), 0.05);

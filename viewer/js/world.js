@@ -8,7 +8,7 @@
 // 벽은 "라인 유니온" 방식으로 만든다: 모든 룸+로비의 4변을 같은 직선끼리 합쳐
 // 경계마다 벽을 딱 한 번만 생성 → 공유벽 이중생성/ z-fighting 없음. 문은 구멍으로 뺀다.
 import * as THREE from '../../vendor/three.module.js';
-import { LAYOUT, wallLeftToWorld, TEXT_DEFAULTS } from '../../shared/schema.js';
+import { LAYOUT, wallLeftToWorld, wallLength, wallFaceStyle, doorCovered, textBlocks } from '../../shared/schema.js';
 import { wallStyleTexture, floorStyleTexture, styledTextTexture, WALL_COLORS } from './textures.js';
 import { makeSpotlight } from './artwork.js';
 
@@ -36,13 +36,13 @@ export function buildWorld(scene, project, layout, patternImages = {}) {
   };
   const rects = [{
     id: '__lobby__', rect: layout.lobby, size: { h: lobbyDef.size.h ?? 8 }, isLobby: true,
-    wall: lobbyDef.wall || { color: '#5f5a53', pattern: 'plain' },
+    wall: lobbyDef.wall || { color: '#5f5a53', pattern: 'plain' }, wallFaces: lobbyDef.wallFaces,
     floor: lobbyDef.floor || { preset: 'walnut-plank' }, lobbyDef,
   }];
   for (let i = 0; i < layout.rooms.length; i++) {
     const lr = layout.rooms[i];
     const room = project.rooms[i];
-    rects.push({ id: lr.id, rect: lr.rect, size: room.size, wall: room.wall, floor: room.floor, room, index: i });
+    rects.push({ id: lr.id, rect: lr.rect, size: room.size, wall: room.wall, wallFaces: room.wallFaces, floor: room.floor, room, index: i });
   }
 
   // ---- 바닥 + 천장 (rect 단위) ----
@@ -73,25 +73,26 @@ export function buildWorld(scene, project, layout, patternImages = {}) {
     group.add(ceil);
   }
 
-  // ---- 벽 라인 유니온 ----
+  // ---- 벽 라인 유니온 (P3: 면 단위 스타일) ----
+  // 각 라인에 "claim"(어느 공간이 어느 쪽에서 이 경계를 쓰는지)을 기록한다.
+  // H 라인: 공간이 라인 남쪽(z>fixed)에 있으면 side 'S' → 벽의 +z 면을 본다.
+  // V 라인: 공간이 라인 동쪽(x>fixed)에 있으면 side 'E' → 벽의 +x 면을 본다.
   const lines = new Map();
-  const addWall = (axis, fixed, a, b, height, wallDef) => {
+  const addWall = (axis, fixed, a, b, height, space, dir, side) => {
     const key = axis === 'H' ? hkey(fixed) : vkey(fixed);
     let L = lines.get(key);
-    if (!L) { L = { axis, fixed, ivals: [], height, wallDef }; lines.set(key, L); }
-    L.ivals.push([Math.min(a, b), Math.max(a, b)]);
+    if (!L) { L = { axis, fixed, ivals: [], claims: [], height }; lines.set(key, L); }
+    const lo = Math.min(a, b), hi = Math.max(a, b);
+    L.ivals.push([lo, hi]);
+    L.claims.push({ lo, hi, space, dir, side });
     L.height = Math.max(L.height, height);
-    if (!L.wallDef) L.wallDef = wallDef;
   };
-  // 로비를 먼저 처리: 로비↔room[0] 공유벽(타이틀월)은 로비 스타일이 우선 (P3).
-  // 트레이드오프: room[0] 남쪽 벽 내부면도 로비 스타일을 따른다(단면 스타일 한계).
-  const ordered = rects.filter(r => r.isLobby).concat(rects.filter(r => !r.isLobby));
-  for (const r of ordered) {
-    const { rect } = r, h = r.size.h, wd = r.wall;
-    addWall('H', rect.zMin, rect.xMin, rect.xMax, h, wd); // north
-    addWall('H', rect.zMax, rect.xMin, rect.xMax, h, wd); // south
-    addWall('V', rect.xMin, rect.zMin, rect.zMax, h, wd); // west
-    addWall('V', rect.xMax, rect.zMin, rect.zMax, h, wd); // east
+  for (const r of rects) {
+    const { rect } = r, h = r.size.h;
+    addWall('H', rect.zMin, rect.xMin, rect.xMax, h, r, 'north', 'S'); // 공간은 라인 남쪽
+    addWall('H', rect.zMax, rect.xMin, rect.xMax, h, r, 'south', 'N');
+    addWall('V', rect.xMin, rect.zMin, rect.zMax, h, r, 'west', 'E');  // 공간은 라인 동쪽
+    addWall('V', rect.xMax, rect.zMin, rect.zMax, h, r, 'east', 'W');
   }
 
   // ---- 문 구멍 ----
@@ -101,12 +102,16 @@ export function buildWorld(scene, project, layout, patternImages = {}) {
     if (!openings.has(key)) openings.set(key, []);
     openings.get(key).push({ center, width: LAYOUT.DOOR_W, height: LAYOUT.DOOR_H });
   };
-  // 로비 → room[0] 통로 (로비 북쪽 벽 z=0, 중앙)
-  addOpening('H', layout.lobby.zMin, 0);
-  // 각 룸 exitDoor
+  // 로비 → 전시 통로 (로비 북쪽 벽 중앙 고정) — P2: 룸이 맞닿아 있을 때만 개구부
+  const lobbyCx = (layout.lobby.xMin + layout.lobby.xMax) / 2;
+  if (doorCovered(layout, '__lobby__', 'north', (layout.lobby.xMax - layout.lobby.xMin) / 2)) {
+    addOpening('H', layout.lobby.zMin, lobbyCx);
+  }
+  // 각 룸 exitDoor — P2: 무효 문(인접 공간 없음/벽 범위 밖)은 벽을 뚫지 않는다
   for (let i = 0; i < layout.rooms.length; i++) {
     const room = project.rooms[i];
     if (!room.exitDoor) continue;
+    if (!doorCovered(layout, room.id, room.exitDoor.wall, room.exitDoor.offset)) continue;
     const d = wallLeftToWorld(layout.rooms[i].rect, room.exitDoor.wall, room.exitDoor.offset);
     if (room.exitDoor.wall === 'north' || room.exitDoor.wall === 'south') addOpening('H', d.z, d.x);
     else addOpening('V', d.x, d.z);
@@ -116,21 +121,54 @@ export function buildWorld(scene, project, layout, patternImages = {}) {
   const baseboardMat = new THREE.MeshStandardMaterial({ color: 0x2c2622, roughness: 0.7 });
   const moldingMat = new THREE.MeshStandardMaterial({ color: 0xe9e0d0, roughness: 0.9 });
 
+  // 면 스타일 → 텍스처 (wallStyleTexture 내부 캐시 사용). claim 없음(외벽) = null.
+  const faceWS = (claim) => {
+    if (!claim) return null;
+    const def = wallFaceStyle(claim.space, claim.dir);
+    return wallStyleTexture(def, patternImages[def?.patternAsset]);
+  };
+  // 위치 t 에서 라인 양쪽 claim 탐색. posSide: H='S'(+z 면), V='E'(+x 면).
+  const claimsAt = (L, t) => {
+    const posSide = L.axis === 'H' ? 'S' : 'E';
+    let pos = null, neg = null;
+    for (const c of L.claims) {
+      if (t < c.lo - 1e-4 || t > c.hi + 1e-4) continue;
+      if (c.side === posSide) pos = pos || c; else neg = neg || c;
+    }
+    return { pos, neg };
+  };
+
   for (const [key, L] of lines) {
     const spans = mergeIvals(L.ivals);
     const ops = (openings.get(key) || []).map(o => [o.center - o.width / 2, o.center + o.width / 2, o.height]);
-    const ws = wallStyleTexture(L.wallDef, patternImages[L.wallDef?.patternAsset]);
 
     for (const [s, e] of spans) {
       // 이 span 내 문 구멍
       const spanOps = ops.filter(o => o[0] >= s - 1e-3 && o[1] <= e + 1e-3);
       const solids = subtractIntervals([s, e], spanOps.map(o => [o[0], o[1]]));
       for (const [ss, ee] of solids) {
-        buildWallBox(group, colliders, L.axis, L.fixed, ss, ee, L.height, ws, baseboardMat, moldingMat);
+        // P3: 면 소속이 달라지는 지점(claim 경계)에서 세그먼트 추가 분할
+        const cuts = new Set([ss, ee]);
+        for (const c of L.claims) {
+          if (c.lo > ss + 1e-4 && c.lo < ee - 1e-4) cuts.add(c.lo);
+          if (c.hi > ss + 1e-4 && c.hi < ee - 1e-4) cuts.add(c.hi);
+        }
+        const pts = [...cuts].sort((a, b) => a - b);
+        for (let i = 0; i < pts.length - 1; i++) {
+          const a = pts[i], b = pts[i + 1];
+          if (b - a < 1e-3) continue;
+          const { pos, neg } = claimsAt(L, (a + b) / 2);
+          const wsPos = faceWS(pos) || faceWS(neg);   // 외벽 바깥면(exterior)은 반대면 스타일로 렌더
+          const wsNeg = faceWS(neg) || faceWS(pos);
+          buildWallBox(group, colliders, L.axis, L.fixed, a, b, L.height, wsPos, wsNeg, baseboardMat, moldingMat);
+        }
       }
-      // 문 상인방(lintel)
+      // 문 상인방(lintel) — 문 중앙 기준 양면 스타일
       for (const o of spanOps) {
-        buildLintel(group, L.axis, L.fixed, o[0], o[1], o[2], L.height, ws);
+        const { pos, neg } = claimsAt(L, (o[0] + o[1]) / 2);
+        const wsPos = faceWS(pos) || faceWS(neg);
+        const wsNeg = faceWS(neg) || faceWS(pos);
+        buildLintel(group, L.axis, L.fixed, o[0], o[1], o[2], L.height, wsPos, wsNeg);
       }
     }
   }
@@ -162,15 +200,8 @@ export function buildWorld(scene, project, layout, patternImages = {}) {
   // ---- 그랜드 로비 데코 (P3 — 전부 절차 생성, 토글) ----
   buildLobbyDecor(group, colliders, rects[0], project);
 
-  // ---- 타이틀월 (로비 북쪽 벽, 문 위 밴드 + 좌측 서문) ----
-  buildTitleWall(group, project, layout.lobby, rects[0].size.h);
-
-  // ---- 섹션 서문 패널 ----
-  for (let i = 0; i < layout.rooms.length; i++) {
-    const room = project.rooms[i];
-    if (!room.intro) continue;
-    buildSectionPanel(group, room, layout.rooms[i].rect, i, layout);
-  }
+  // ---- 텍스트 오브젝트 (v1.3 P4 — 타이틀월/섹션 패널 포함 자유 배치) ----
+  buildTexts(group, project, layout);
 
   return { group, colliders, rects, moodLights };
 }
@@ -200,12 +231,25 @@ function subtractIntervals(span, cuts) {
   return segs.filter(([s, e]) => e - s > 1e-3);
 }
 
-// --- 벽 박스 하나 ----------------------------------------------------------
-function buildWallBox(group, colliders, axis, fixed, s, e, height, ws, baseboardMat, moldingMat) {
-  const len = e - s;
+// --- 벽 재질 (면 하나) ------------------------------------------------------
+function wallFaceMat(ws, len, height) {
   const tex = ws.tex.clone(); tex.needsUpdate = true;
   tex.repeat.set(len / ws.tileM, height / ws.tileM);
-  const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.94, metalness: 0 });
+  return new THREE.MeshStandardMaterial({ map: tex, roughness: 0.94, metalness: 0 });
+}
+
+// --- 벽 박스 하나 (P3: 양면 재질 분리) ---------------------------------------
+// BoxGeometry 재질 순서 [+x, -x, +y, -y, +z, -z].
+// H 벽: +z 면 = 라인 남쪽 공간이 보는 면(wsPos), -z 면 = 북쪽 공간 면(wsNeg).
+// V 벽: +x 면 = 동쪽 공간 면(wsPos), -x 면 = 서쪽 공간 면(wsNeg).
+function buildWallBox(group, colliders, axis, fixed, s, e, height, wsPos, wsNeg, baseboardMat, moldingMat) {
+  const len = e - s;
+  const mPos = wallFaceMat(wsPos, len, height);
+  const mNeg = wsNeg === wsPos ? mPos : wallFaceMat(wsNeg, len, height);
+  const mCap = mPos; // 단면(문설주)·상하부는 pos 면 스타일
+  const mat = axis === 'H'
+    ? [mCap, mCap, mCap, mCap, mPos, mNeg]
+    : [mPos, mNeg, mCap, mCap, mCap, mCap];
 
   let geo, px, pz, sx, sz;
   if (axis === 'H') { sx = len; sz = T; px = (s + e) / 2; pz = fixed; }
@@ -230,14 +274,16 @@ function buildWallBox(group, colliders, axis, fixed, s, e, height, ws, baseboard
   else colliders.push({ minX: fixed - T / 2, maxX: fixed + T / 2, minZ: s, maxZ: e });
 }
 
-// --- 문 위 상인방 ----------------------------------------------------------
-function buildLintel(group, axis, fixed, o0, o1, doorH, wallH, ws) {
+// --- 문 위 상인방 (P3: 양면 재질 분리) ---------------------------------------
+function buildLintel(group, axis, fixed, o0, o1, doorH, wallH, wsPos, wsNeg) {
   const len = o1 - o0;
   const h = wallH - doorH;
   if (h <= 0.01) return;
-  const tex = ws.tex.clone(); tex.needsUpdate = true;
-  tex.repeat.set(len / ws.tileM, h / ws.tileM);
-  const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.94 });
+  const mPos = wallFaceMat(wsPos, len, h);
+  const mNeg = wsNeg === wsPos ? mPos : wallFaceMat(wsNeg, len, h);
+  const mat = axis === 'H'
+    ? [mPos, mPos, mPos, mPos, mPos, mNeg]
+    : [mPos, mNeg, mPos, mPos, mPos, mPos];
   let sx, sz, px, pz;
   if (axis === 'H') { sx = len; sz = T; px = (o0 + o1) / 2; pz = fixed; }
   else { sx = T; sz = len; px = fixed; pz = (o0 + o1) / 2; }
@@ -448,80 +494,49 @@ function addCarpet(group, rect) {
   }
 }
 
-// --- 타이틀월 (P4 텍스트월 스타일 시스템 적용) ------------------------------
-function buildTitleWall(group, project, lobby, wallH = 4.2) {
-  const m = project.meta;
-  const ts = project.titleStyle || TEXT_DEFAULTS.title;
-  const is = project.introStyle || TEXT_DEFAULTS.body;
-  const pn = project.titlePanel || TEXT_DEFAULTS.titlePanel;
-  const wallW = lobby.xMax - lobby.xMin;
-  const z = lobby.zMin + T / 2 + 0.03; // 벽 안쪽면보다 살짝 앞 (문은 이 벽 중앙)
+// --- 텍스트 오브젝트 렌더 (v1.3 P4 — 자유 배치) ------------------------------
+// 벽 안쪽면을 향하도록 회전. north 벽(zMin)은 실내가 +z 쪽 → 회전 0 (기본 법선 +Z).
+const TEXT_WALL_ROT = { north: 0, south: Math.PI, east: -Math.PI / 2, west: Math.PI / 2 };
+const TEXT_WALL_NORMAL = { north: [0, 1], south: [0, -1], east: [-1, 0], west: [1, 0] };
 
-  // 제목 블록 — 문 위 상부
-  const band = styledTextTexture({
-    blocks: [
-      { text: m.title || '', style: ts, gapCm: 8 },
-      { text: m.subtitle || '', style: { ...ts, sizeCm: ts.sizeCm * 0.42, weight: 400 }, gapCm: 12 },
-      { text: m.curator ? `큐레이션 · ${m.curator}` : '', style: { ...is, color: '#B9A986' } },
-    ],
-    panel: { ...pn, widthCm: Math.min(pn.widthCm || 900, (wallW - 1.0) * 100) },
-  });
-  const bandMesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(band.wM, band.hM),
-    new THREE.MeshBasicMaterial({ map: band.texture, transparent: true })
-  );
-  const bandY = Math.min(LAYOUT.DOOR_H + 0.35 + band.hM / 2, wallH - band.hM / 2 - 0.2);
-  bandMesh.position.set(0, bandY, z);
-  // PlaneGeometry 기본 법선 = +Z → 로비(남쪽)에서 보임. 회전 불필요.
-  group.add(bandMesh);
-  // 텍스트 스포트라이트 (작품 조명과 동일 시스템 — P4)
-  if (pn.light?.on) {
-    makeSpotlight(group, new THREE.Vector3(0, bandY, z), {
-      nx: 0, nz: 1, intensity: pn.light.intensity ?? 1.2, temp: pn.light.temp || 'warm',
-      ceilingY: wallH - 0.3,
-    });
+function buildTexts(group, project, layout) {
+  const spaces = [{ def: project.lobby, rect: layout.lobby }];
+  for (let i = 0; i < layout.rooms.length; i++) {
+    spaces.push({ def: project.rooms[i], rect: layout.rooms[i].rect });
   }
-
-  // 좌측 서문 패널 (본문 블록)
-  if (m.intro) {
-    const availW = (wallW - LAYOUT.DOOR_W) / 2 - 0.6;
-    if (availW > 1) {
-      const ip = styledTextTexture({
-        blocks: [{ text: m.intro, style: is }],
-        panel: { align: 'left', bg: pn.bg, widthCm: Math.min(availW, 3.4) * 100 },
-      });
-      const panel = new THREE.Mesh(new THREE.PlaneGeometry(ip.wM, ip.hM),
-        new THREE.MeshBasicMaterial({ map: ip.texture, transparent: true }));
-      panel.position.set(-(LAYOUT.DOOR_W / 2 + 0.4 + ip.wM / 2), 1.55, z);
-      group.add(panel);
-    }
+  for (const sp of spaces) {
+    if (!sp.def || !sp.rect) continue;
+    const wallH = sp.def.size?.h ?? 4.2;
+    for (const t of (sp.def.texts || [])) buildTextObject(group, project, sp.def, sp.rect, t, wallH);
   }
 }
 
-// --- 섹션 서문 패널 (P4 스타일 적용) ----------------------------------------
-function buildSectionPanel(group, room, rect, index, layout) {
-  const ts = room.introTitleStyle || TEXT_DEFAULTS.secTitle;
-  const bs = room.introBodyStyle || TEXT_DEFAULTS.secBody;
-  const pn = room.introPanel || TEXT_DEFAULTS.introPanel;
+function buildTextObject(group, project, spaceDef, rect, t, wallH) {
+  const blocks = textBlocks(project, spaceDef, t).filter(b => b.text);
+  if (!blocks.length) return; // 내용 없는 역할 오브젝트는 렌더 생략
+  const wall = t.placement?.wall || 'north';
+  const len = wallLength(rect, wall);
   const p = styledTextTexture({
-    blocks: [
-      { text: room.name || '', style: ts, gapCm: 5 },
-      { text: room.intro || '', style: bs },
-    ],
-    panel: pn,
+    blocks,
+    panel: { align: t.panel?.align || 'left', bg: t.panel?.bg || 'none',
+             widthCm: Math.min(t.widthCm || 300, Math.max(40, len * 100 - 20)) },
   });
-  const panel = new THREE.Mesh(new THREE.PlaneGeometry(p.wM, p.hM),
-    new THREE.MeshBasicMaterial({ map: p.texture, transparent: true }));
-  // east 벽 안쪽면(-X 방향을 바라봄), 남쪽 코너에서 1.8m (v1 자동 위치 고정)
-  const zc = rect.zMax - 1.8;
-  const py = 1.6;
-  panel.position.set(rect.xMax - T / 2 - 0.03, py, zc);
-  panel.rotation.y = -Math.PI / 2;
-  group.add(panel);
-  if (pn.light?.on) {
-    makeSpotlight(group, new THREE.Vector3(rect.xMax - T / 2, py, zc), {
-      nx: -1, nz: 0, intensity: pn.light.intensity ?? 1.0, temp: pn.light.temp || 'warm',
-      ceilingY: room.size.h - 0.25,
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(p.wM, p.hM),
+    new THREE.MeshBasicMaterial({ map: p.texture, transparent: true })
+  );
+  const at = wallLeftToWorld(rect, wall, Math.max(0, Math.min(len, t.placement?.x ?? len / 2)));
+  const [nx, nz] = TEXT_WALL_NORMAL[wall];
+  const off = T / 2 + 0.03;
+  const y = Math.min(Math.max((t.placement?.centerHeightCm ?? 160) / 100, p.hM / 2 + 0.05), wallH - p.hM / 2 - 0.05);
+  mesh.position.set(at.x + nx * off, y, at.z + nz * off);
+  mesh.rotation.y = TEXT_WALL_ROT[wall];
+  group.add(mesh);
+  // 텍스트 스포트라이트 (작품 조명과 동일 시스템)
+  if (t.light?.on) {
+    makeSpotlight(group, new THREE.Vector3(at.x + nx * off, y, at.z + nz * off), {
+      nx, nz, intensity: t.light.intensity ?? 1.2, temp: t.light.temp || 'warm',
+      ceilingY: wallH - 0.3,
     });
   }
 }

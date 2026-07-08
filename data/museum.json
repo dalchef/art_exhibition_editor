@@ -1,0 +1,815 @@
+{
+  "schemaVersion": 2,
+  "meta": {
+    "slug": "my-museum",
+    "title": "빈센트 반고흐 \n영혼의 그림자",
+    "subtitle": "우리가 영원히 사랑하는 작가 ",
+    "curator": "정우철 콜렉션",
+    "intro": "",
+    "createdAt": "2026-07-06",
+    "language": "ko",
+    "deployUrl": ""
+  },
+  "titleStyle": {
+    "font": "serif",
+    "weight": 700,
+    "sizeCm": 28,
+    "color": "#F2E9DB",
+    "letterSpacing": 0.06,
+    "lineHeight": 1.35
+  },
+  "introStyle": {
+    "font": "serif",
+    "weight": 400,
+    "sizeCm": 9,
+    "color": "#D9C9A8",
+    "letterSpacing": 0.02,
+    "lineHeight": 1.7
+  },
+  "titlePanel": {
+    "align": "center",
+    "bg": "none",
+    "widthCm": 900,
+    "light": {
+      "on": true,
+      "intensity": 1.2,
+      "temp": "warm"
+    }
+  },
+  "lobby": {
+    "size": {
+      "w": 18,
+      "d": 12,
+      "h": 5
+    },
+    "wall": {
+      "preset": "gray",
+      "pattern": "plain",
+      "color": "#5f5a53",
+      "patternOpacity": 1,
+      "patternScale": 2.6,
+      "patternMirror": false
+    },
+    "floor": {
+      "preset": "walnut-plank"
+    },
+    "lighting": {
+      "mood": "warm",
+      "ambient": 0.85
+    },
+    "decor": {
+      "chandelier": true,
+      "columns": true,
+      "cofferedCeiling": true,
+      "goldTrim": true,
+      "carpet": true
+    },
+    "artworks": [
+      {
+        "id": "aw-zlrfo6",
+        "image": "assets/artworks/aw-zlrfo6.webp",
+        "thumb": "assets/thumbs/aw-zlrfo6.webp",
+        "caption": {
+          "title": "Korenveld_met_kraaien_-_s0149V1962_-_Van_Gogh_Museum",
+          "artist": "",
+          "year": "",
+          "medium": "",
+          "collection": "",
+          "credit": "Public domain",
+          "sourceUrl": ""
+        },
+        "sizeCm": {
+          "w": 80,
+          "h": 38.3
+        },
+        "scale": 3,
+        "placement": {
+          "wall": "south",
+          "x": 9.02,
+          "centerHeightCm": 241
+        },
+        "frame": {
+          "style": "gold",
+          "matte": false,
+          "matteColor": "#f3ead8"
+        },
+        "light": {
+          "intensity": 1.2,
+          "temp": "warm"
+        }
+      }
+    ],
+    "wallFaces": {
+      "north": {
+        "preset": "gray",
+        "pattern": "plain",
+        "color": "#2c4436",
+        "patternOpacity": 1,
+        "patternScale": 2.6,
+        "patternMirror": false
+      }
+    },
+    "texts": [
+      {
+        "id": "tx-title",
+        "role": "title",
+        "text": "",
+        "placement": {
+          "wall": "north",
+          "x": 9,
+          "centerHeightCm": 340
+        },
+        "widthCm": 900,
+        "style": {
+          "font": "pretendard",
+          "weight": 700,
+          "italic": false,
+          "sizeCm": 28,
+          "color": "#F2E9DB",
+          "letterSpacing": 0.06,
+          "lineHeight": 1.35,
+          "shadow": "none",
+          "shadowColor": ""
+        },
+        "panel": {
+          "align": "center",
+          "bg": "none"
+        },
+        "light": {
+          "on": true,
+          "intensity": 1.2,
+          "temp": "warm"
+        },
+        "_screen": {
+          "x": 233.76187499999997,
+          "y": 298.8403727416992,
+          "w": 296.03875000000005,
+          "h": 46.11150451660156,
+          "cx": 381.78125,
+          "cy": 321.896125,
+          "wM": 9,
+          "hM": 1.40185546875
+        }
+      },
+      {
+        "id": "tx-intro",
+        "role": "intro",
+        "text": "",
+        "placement": {
+          "wall": "north",
+          "x": 6,
+          "centerHeightCm": 155
+        },
+        "widthCm": 340,
+        "style": {
+          "font": "serif",
+          "weight": 400,
+          "italic": false,
+          "sizeCm": 9,
+          "color": "#D9C9A8",
+          "letterSpacing": 0.02,
+          "lineHeight": 1.7,
+          "shadow": "none",
+          "shadowColor": ""
+        },
+        "panel": {
+          "align": "left",
+          "bg": "none"
+        },
+        "light": {
+          "on": false,
+          "intensity": 1,
+          "temp": "warm"
+        },
+        "_screen": {
+          "x": 227.18323611111106,
+          "y": 374.52523611111116,
+          "w": 111.83686111111112,
+          "h": 16.446597222222223,
+          "cx": 283.10166666666663,
+          "cy": 382.74853472222225,
+          "wM": 3.4,
+          "hM": 0.5
+        }
+      }
+    ]
+  },
+  "avatarDefaults": {
+    "preset": "capybara",
+    "body": "default",
+    "garment": "#8DA98A"
+  },
+  "route": [
+    "aw-zlgcw4",
+    "aw-zlt2ug",
+    "aw-zls0a9",
+    "aw-zlrm68",
+    "aw-zlrhs7",
+    "aw-zlra35",
+    "aw-zlrfo6"
+  ],
+  "rooms": [
+    {
+      "id": "room-zkqxo1",
+      "name": "1. 첫 번째 섹션",
+      "intro": "나도 나를 버렸다 ",
+      "introTitleStyle": {
+        "font": "serif",
+        "weight": 700,
+        "sizeCm": 20,
+        "color": "#ffffff",
+        "letterSpacing": 0.04,
+        "lineHeight": 1.4
+      },
+      "introBodyStyle": {
+        "font": "serif",
+        "weight": 400,
+        "sizeCm": 6.5,
+        "color": "#000000",
+        "letterSpacing": 0.01,
+        "lineHeight": 1.75
+      },
+      "introPanel": {
+        "align": "left",
+        "bg": "dark",
+        "widthCm": 260,
+        "light": {
+          "on": false,
+          "intensity": 1.6,
+          "temp": "warm"
+        }
+      },
+      "size": {
+        "w": 16.2,
+        "d": 14.6,
+        "h": 4.5
+      },
+      "wall": {
+        "preset": "deep-red",
+        "pattern": "damask",
+        "color": "#2c4436",
+        "patternOpacity": 1,
+        "patternScale": 2.6,
+        "patternMirror": false
+      },
+      "floor": {
+        "preset": "walnut-herringbone"
+      },
+      "lighting": {
+        "mood": "warm",
+        "ambient": 0.6
+      },
+      "decor": {
+        "benches": true,
+        "spotlights": true
+      },
+      "exitDoor": {
+        "wall": "west",
+        "offset": 6
+      },
+      "artworks": [
+        {
+          "id": "aw-zlgcw4",
+          "image": "assets/artworks/aw-zlgcw4.webp",
+          "thumb": "assets/thumbs/aw-zlgcw4.webp",
+          "caption": {
+            "title": "Vincent_van_Gogh_-_Sorrow",
+            "artist": "",
+            "year": "",
+            "medium": "",
+            "collection": "",
+            "credit": "Public domain",
+            "sourceUrl": ""
+          },
+          "sizeCm": {
+            "w": 50.6,
+            "h": 80
+          },
+          "scale": 2.96,
+          "placement": {
+            "wall": "west",
+            "x": 1.84,
+            "centerHeightCm": 203
+          },
+          "frame": {
+            "style": "gold",
+            "matte": false,
+            "matteColor": "#f3ead8"
+          },
+          "light": {
+            "intensity": 1.2,
+            "temp": "warm"
+          }
+        },
+        {
+          "id": "aw-zlt2ug",
+          "image": "assets/artworks/aw-zlt2ug.webp",
+          "thumb": "assets/thumbs/aw-zlt2ug.webp",
+          "caption": {
+            "title": "The_Potato_Eaters_-_Vincent_Van_Gogh",
+            "artist": "",
+            "year": "",
+            "medium": "",
+            "collection": "",
+            "credit": "Public domain",
+            "sourceUrl": ""
+          },
+          "sizeCm": {
+            "w": 80,
+            "h": 60.6
+          },
+          "scale": 3,
+          "placement": {
+            "wall": "east",
+            "x": 2.9,
+            "centerHeightCm": 220
+          },
+          "frame": {
+            "style": "gold",
+            "matte": false,
+            "matteColor": "#f3ead8"
+          },
+          "light": {
+            "intensity": 1.2,
+            "temp": "warm"
+          }
+        }
+      ],
+      "origin": {
+        "x": -6,
+        "z": -14.6
+      },
+      "texts": [
+        {
+          "id": "tx-sec-room-zkqxo1",
+          "role": "section",
+          "text": "",
+          "placement": {
+            "wall": "east",
+            "x": 12.04,
+            "centerHeightCm": 277
+          },
+          "widthCm": 417,
+          "style": {
+            "font": "pretendard",
+            "weight": 700,
+            "italic": true,
+            "sizeCm": 32.1,
+            "color": "#ffffff",
+            "letterSpacing": 0.04,
+            "lineHeight": 1.4,
+            "shadow": "none",
+            "shadowColor": ""
+          },
+          "bodyStyle": {
+            "italic": false,
+            "shadow": "none",
+            "shadowColor": "",
+            "font": "serif",
+            "weight": 400,
+            "sizeCm": 10.4,
+            "color": "#ffffff",
+            "letterSpacing": 0.01,
+            "lineHeight": 1.75
+          },
+          "panel": {
+            "align": "left",
+            "bg": "none"
+          },
+          "light": {
+            "on": true,
+            "intensity": 1.6,
+            "temp": "neutral"
+          },
+          "_screen": {
+            "x": 489.4501378424658,
+            "y": 312.94837041442037,
+            "w": 169.10706678082192,
+            "h": 34.92787560951546,
+            "cx": 574.0036712328767,
+            "cy": 330.4123082191781,
+            "wM": 4.17,
+            "hM": 0.8612841796874999
+          }
+        }
+      ]
+    },
+    {
+      "id": "room-zkqxo2",
+      "name": "2. 두 번째 섹션",
+      "intro": "",
+      "introTitleStyle": {
+        "font": "serif",
+        "weight": 700,
+        "sizeCm": 12,
+        "color": "#3A2F24",
+        "letterSpacing": 0.04,
+        "lineHeight": 1.4
+      },
+      "introBodyStyle": {
+        "font": "sans",
+        "weight": 400,
+        "sizeCm": 6.5,
+        "color": "#5A4C3C",
+        "letterSpacing": 0.01,
+        "lineHeight": 1.75
+      },
+      "introPanel": {
+        "align": "left",
+        "bg": "light",
+        "widthCm": 260,
+        "light": {
+          "on": false,
+          "intensity": 1,
+          "temp": "warm"
+        }
+      },
+      "size": {
+        "w": 16,
+        "d": 12,
+        "h": 4.2
+      },
+      "wall": {
+        "preset": "deep-red",
+        "pattern": "custom",
+        "color": "#ffffff",
+        "patternOpacity": 0.6,
+        "patternScale": 1.25,
+        "patternMirror": true,
+        "patternAsset": "assets/patterns/pat-8w54v3.webp"
+      },
+      "floor": {
+        "preset": "oak-herringbone"
+      },
+      "lighting": {
+        "mood": "cool",
+        "ambient": 0.6
+      },
+      "decor": {
+        "benches": false,
+        "spotlights": true
+      },
+      "exitDoor": {
+        "wall": "north",
+        "offset": 6
+      },
+      "artworks": [
+        {
+          "id": "aw-zls0a9",
+          "image": "assets/artworks/aw-zls0a9.webp",
+          "thumb": "assets/thumbs/aw-zls0a9.webp",
+          "caption": {
+            "title": "Vincent_van_Gogh_-_Dr_Paul_Gachet_-_Google_Art_Project",
+            "artist": "",
+            "year": "",
+            "medium": "",
+            "collection": "",
+            "credit": "Public domain",
+            "sourceUrl": ""
+          },
+          "sizeCm": {
+            "w": 66.5,
+            "h": 80
+          },
+          "scale": 3,
+          "placement": {
+            "wall": "south",
+            "x": 2.56,
+            "centerHeightCm": 213
+          },
+          "frame": {
+            "style": "gold",
+            "matte": false,
+            "matteColor": "#f3ead8"
+          },
+          "light": {
+            "intensity": 1.2,
+            "temp": "warm"
+          }
+        },
+        {
+          "id": "aw-zlrm68",
+          "image": "assets/artworks/aw-zlrm68.webp",
+          "thumb": "assets/thumbs/aw-zlrm68.webp",
+          "caption": {
+            "title": "Vincent_Van_Gogh,_la_chiesa_di_auvers-sur-oise,_1890,_01",
+            "artist": "",
+            "year": "",
+            "medium": "",
+            "collection": "",
+            "credit": "Public domain",
+            "sourceUrl": ""
+          },
+          "sizeCm": {
+            "w": 67.1,
+            "h": 80
+          },
+          "scale": 2.963,
+          "placement": {
+            "wall": "south",
+            "x": 11.62,
+            "centerHeightCm": 212
+          },
+          "frame": {
+            "style": "gold",
+            "matte": false,
+            "matteColor": "#f3ead8"
+          },
+          "light": {
+            "intensity": 1.2,
+            "temp": "warm"
+          }
+        },
+        {
+          "id": "aw-zlrhs7",
+          "image": "assets/artworks/aw-zlrhs7.webp",
+          "thumb": "assets/thumbs/aw-zlrhs7.webp",
+          "caption": {
+            "title": "WLANL_-_MicheleLovesArt_-_Van_Gogh_Museum_-_Wheatfield_with_crows,_1890",
+            "artist": "",
+            "year": "",
+            "medium": "",
+            "collection": "",
+            "credit": "Public domain",
+            "sourceUrl": ""
+          },
+          "sizeCm": {
+            "w": 80,
+            "h": 45.2
+          },
+          "scale": 3,
+          "placement": {
+            "wall": "west",
+            "x": 2.78,
+            "centerHeightCm": 202
+          },
+          "frame": {
+            "style": "gold",
+            "matte": false,
+            "matteColor": "#f3ead8"
+          },
+          "light": {
+            "intensity": 1.2,
+            "temp": "warm"
+          }
+        },
+        {
+          "id": "aw-zlra35",
+          "image": "assets/artworks/aw-zlra35.webp",
+          "thumb": "assets/thumbs/aw-zlra35.webp",
+          "caption": {
+            "title": "WLANL_-_MicheleLovesArt_-_Van_Gogh_Museum_-_Tree-roots,_1890",
+            "artist": "",
+            "year": "",
+            "medium": "",
+            "collection": "",
+            "credit": "Public domain",
+            "sourceUrl": ""
+          },
+          "sizeCm": {
+            "w": 80,
+            "h": 46.3
+          },
+          "scale": 3,
+          "placement": {
+            "wall": "west",
+            "x": 8.64,
+            "centerHeightCm": 209
+          },
+          "frame": {
+            "style": "gold",
+            "matte": false,
+            "matteColor": "#f3ead8"
+          },
+          "light": {
+            "intensity": 1.2,
+            "temp": "warm"
+          }
+        }
+      ],
+      "origin": {
+        "x": -22,
+        "z": -12
+      },
+      "texts": [
+        {
+          "id": "tx-sec-room-zkqxo2",
+          "role": "section",
+          "text": "",
+          "placement": {
+            "wall": "east",
+            "x": 10.2,
+            "centerHeightCm": 160
+          },
+          "widthCm": 260,
+          "style": {
+            "font": "serif",
+            "weight": 700,
+            "italic": false,
+            "sizeCm": 12,
+            "color": "#3A2F24",
+            "letterSpacing": 0.04,
+            "lineHeight": 1.4,
+            "shadow": "none",
+            "shadowColor": ""
+          },
+          "bodyStyle": {
+            "italic": false,
+            "shadow": "none",
+            "shadowColor": "",
+            "font": "sans",
+            "weight": 400,
+            "sizeCm": 6.5,
+            "color": "#5A4C3C",
+            "letterSpacing": 0.01,
+            "lineHeight": 1.75
+          },
+          "panel": {
+            "align": "left",
+            "bg": "light"
+          },
+          "light": {
+            "on": false,
+            "intensity": 1,
+            "temp": "warm"
+          }
+        }
+      ]
+    },
+    {
+      "id": "room-zt1pyh",
+      "name": "3. 새 섹션",
+      "intro": "",
+      "introTitleStyle": {
+        "font": "sans",
+        "weight": 700,
+        "sizeCm": 20,
+        "color": "#3A2F24",
+        "letterSpacing": 0.05,
+        "lineHeight": 1.4
+      },
+      "introBodyStyle": {
+        "font": "sans",
+        "weight": 400,
+        "sizeCm": 6.5,
+        "color": "#ffffff",
+        "letterSpacing": 0.01,
+        "lineHeight": 1.75
+      },
+      "introPanel": {
+        "align": "left",
+        "bg": "light",
+        "widthCm": 260,
+        "light": {
+          "on": true,
+          "intensity": 0.6,
+          "temp": "neutral"
+        }
+      },
+      "size": {
+        "w": 12,
+        "d": 20,
+        "h": 4.2
+      },
+      "wall": {
+        "preset": "deep-red",
+        "pattern": "plain",
+        "color": "#ffffff",
+        "patternOpacity": 1,
+        "patternScale": 2.6,
+        "patternMirror": true
+      },
+      "floor": {
+        "preset": "walnut-herringbone"
+      },
+      "lighting": {
+        "mood": "warm",
+        "ambient": 0.6
+      },
+      "decor": {
+        "benches": false,
+        "spotlights": true
+      },
+      "exitDoor": {
+        "wall": "east",
+        "offset": 6
+      },
+      "artworks": [],
+      "origin": {
+        "x": -22,
+        "z": -32
+      },
+      "texts": [
+        {
+          "id": "tx-sec-room-zt1pyh",
+          "role": "section",
+          "text": "",
+          "placement": {
+            "wall": "east",
+            "x": 18.08,
+            "centerHeightCm": 176
+          },
+          "widthCm": 261,
+          "style": {
+            "font": "sans",
+            "weight": 700,
+            "italic": false,
+            "sizeCm": 20,
+            "color": "#3A2F24",
+            "letterSpacing": 0.05,
+            "lineHeight": 1.4,
+            "shadow": "none",
+            "shadowColor": ""
+          },
+          "bodyStyle": {
+            "italic": false,
+            "shadow": "none",
+            "shadowColor": "",
+            "font": "sans",
+            "weight": 400,
+            "sizeCm": 6.5,
+            "color": "#ffffff",
+            "letterSpacing": 0.01,
+            "lineHeight": 1.75
+          },
+          "panel": {
+            "align": "left",
+            "bg": "light"
+          },
+          "light": {
+            "on": true,
+            "intensity": 0.6,
+            "temp": "neutral"
+          },
+          "_screen": {
+            "x": 582.347503125,
+            "y": 354.016329375,
+            "w": 77.26611375,
+            "h": 15.097976250000002,
+            "cx": 620.98056,
+            "cy": 361.5653175,
+            "wM": 2.61,
+            "hM": 0.51
+          }
+        }
+      ]
+    },
+    {
+      "origin": {
+        "x": -10,
+        "z": -32
+      },
+      "id": "room-cd1th1",
+      "name": "4. 새 섹션",
+      "intro": "",
+      "introTitleStyle": {
+        "font": "serif",
+        "weight": 700,
+        "sizeCm": 12,
+        "color": "#3A2F24",
+        "letterSpacing": 0.04,
+        "lineHeight": 1.4
+      },
+      "introBodyStyle": {
+        "font": "sans",
+        "weight": 400,
+        "sizeCm": 6.5,
+        "color": "#5A4C3C",
+        "letterSpacing": 0.01,
+        "lineHeight": 1.75
+      },
+      "introPanel": {
+        "align": "left",
+        "bg": "light",
+        "widthCm": 260,
+        "light": {
+          "on": false,
+          "intensity": 1,
+          "temp": "warm"
+        }
+      },
+      "size": {
+        "w": 20,
+        "d": 9,
+        "h": 4.2
+      },
+      "wall": {
+        "preset": "deep-red",
+        "pattern": true
+      },
+      "floor": {
+        "preset": "walnut-herringbone"
+      },
+      "lighting": {
+        "mood": "warm",
+        "ambient": 0.6
+      },
+      "decor": {
+        "benches": true,
+        "spotlights": true
+      },
+      "exitDoor": null,
+      "artworks": []
+    }
+  ]
+}

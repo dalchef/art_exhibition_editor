@@ -59,6 +59,16 @@ SOFTWARE.
 
 ---
 
+## Noto Sans KR — korean subset (400/700)
+
+- 저작권: © Google LLC (Source Han Sans 기반)
+- 라이선스: SIL Open Font License 1.1 (OFL)
+- 출처: https://fonts.google.com/noto/specimen/Noto+Sans+KR (fontsource 서브셋 빌드 경유)
+- 포함 파일: `vendor/noto-sans-kr/NotoSansKR-400.woff2`, `vendor/noto-sans-kr/NotoSansKR-700.woff2`
+- 용도: 텍스트 오브젝트 산세리프 타이포그래피 (v1.3 P4)
+
+---
+
 ## Pretendard — 1.3.9
 
 - 저작권: © 2021 Kil Hyung-jin (길형진)

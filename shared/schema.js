@@ -20,7 +20,10 @@
 //   - 문/작품 offset·x 는 위 "왼쪽 끝(0)"에서의 거리(m).  → wallLeftToWorld() 참조.
 // ---------------------------------------------------------------------------
 
-export const SCHEMA_VERSION = 1;
+// v2 (v1.3 P3): 벽면(face) 단위 스타일 — 룸/로비의 wallFaces[dir] 오버라이드 지원.
+// 벽 스타일 해석: wallFaces[dir] 이 있으면 그 면(해당 룸 쪽)에 사용, 없으면 room.wall 폴백.
+// v1 프로젝트는 wallFaces 부재 → 모든 면이 room.wall 폴백 = 기존 룸 단위 스타일과 동등.
+export const SCHEMA_VERSION = 2;
 
 // 고정 치수 / 허용 범위 -------------------------------------------------------
 export const LAYOUT = Object.freeze({
@@ -32,7 +35,8 @@ export const LAYOUT = Object.freeze({
 });
 
 export const RANGES = Object.freeze({
-  roomW: [6, 20], roomD: [6, 16], roomH: [3.5, 5],
+  // P2: 자유 배치 마이그레이션에서 east/west 진행 룸의 w/d 가 실측 축으로 정규화되므로 d 상한을 w 와 동일하게.
+  roomW: [6, 20], roomD: [6, 20], roomH: [3.5, 5],
   rooms: [2, 5],
   spotIntensity: [0.5, 2.0],
 });
@@ -78,7 +82,7 @@ export function makePanel(base, overrides = {}) {
 // lobby 필드 부재 시 기본값 자동 생성(schemaVersion 1 유지, 기존 프로젝트 호환).
 export const LOBBY_RANGES = Object.freeze({ w: [10, 24], d: [8, 18], h: [5, 10] });
 export function makeLobby(overrides = {}) {
-  return {
+  const lobby = {
     size: { w: 18, d: 12, h: 8, ...(overrides.size || {}) },
     wall: { preset: 'gray', pattern: false, ...(overrides.wall || {}) },
     floor: { preset: 'walnut-plank', ...(overrides.floor || {}) },
@@ -87,6 +91,9 @@ export function makeLobby(overrides = {}) {
              ...(overrides.decor || {}) },
     artworks: overrides.artworks || [],
   };
+  if (overrides.wallFaces) lobby.wallFaces = overrides.wallFaces; // P3 면 단위 오버라이드 보존
+  if (overrides.texts) lobby.texts = overrides.texts;             // P4 텍스트 오브젝트 보존
+  return lobby;
 }
 export function ensureLobby(project) {
   if (!project.lobby) project.lobby = makeLobby();
@@ -117,9 +124,55 @@ export function normalizeFloor(f = {}) {
   return out;
 }
 export function normalizeSurfaces(project) {
-  for (const r of (project.rooms || [])) { r.wall = normalizeWall(r.wall); r.floor = normalizeFloor(r.floor); }
-  if (project.lobby) { project.lobby.wall = normalizeWall(project.lobby.wall); project.lobby.floor = normalizeFloor(project.lobby.floor); }
+  const norm = (r) => {
+    r.wall = normalizeWall(r.wall);
+    r.floor = normalizeFloor(r.floor);
+    // P3: 면 단위 오버라이드도 동일 정규화
+    if (r.wallFaces) {
+      for (const k of Object.keys(r.wallFaces)) r.wallFaces[k] = normalizeWall(r.wallFaces[k]);
+    }
+  };
+  for (const r of (project.rooms || [])) norm(r);
+  if (project.lobby) norm(project.lobby);
+  // P3 마이그레이션: v1(벽=룸 단위 스타일) → v2. wallFaces 부재 시 room.wall 폴백이
+  // "그 룸을 향한 모든 면 = 룸 스타일"과 동등하므로 데이터 복사 없이 버전만 상향.
+  project.schemaVersion = SCHEMA_VERSION;
   return project;
+}
+
+// P3: 공간(room|lobby)의 dir 쪽 벽면 유효 스타일. 오버라이드 → 룸 기본 순.
+export function wallFaceStyle(space, dir) {
+  return (space?.wallFaces && space.wallFaces[dir]) || space?.wall;
+}
+
+// P3: 반대면 탐색 — roomId 의 wallDir 벽과 같은 경계선을 공유하는 이웃 공간.
+// 반환 { roomId, wall(이웃 기준 방향), name } | null(외벽 = exterior).
+// 이웃이 여럿(부분 접촉)이면 겹침 길이가 가장 큰 쪽.
+export function findOppositeFace(project, roomId, wallDir, layout) {
+  layout = layout || computeLayout(project);
+  if (!layout.lobby) return null;
+  const spaces = [
+    { id: '__lobby__', rect: layout.lobby, name: '로비' },
+    ...layout.rooms.map((lr, i) => ({ id: lr.id, rect: lr.rect, name: project.rooms[i]?.name || `룸 ${i + 1}` })),
+  ];
+  const me = spaces.find(s => s.id === roomId);
+  if (!me) return null;
+  const EPS = 1e-3;
+  const OPP = { north: 'south', south: 'north', east: 'west', west: 'east' };
+  let best = null;
+  for (const s of spaces) {
+    if (s.id === roomId) continue;
+    const A = me.rect, B = s.rect;
+    let touch = false, overlap = 0;
+    if (wallDir === 'north') { touch = Math.abs(B.zMax - A.zMin) < EPS; overlap = Math.min(A.xMax, B.xMax) - Math.max(A.xMin, B.xMin); }
+    else if (wallDir === 'south') { touch = Math.abs(B.zMin - A.zMax) < EPS; overlap = Math.min(A.xMax, B.xMax) - Math.max(A.xMin, B.xMin); }
+    else if (wallDir === 'west') { touch = Math.abs(B.xMax - A.xMin) < EPS; overlap = Math.min(A.zMax, B.zMax) - Math.max(A.zMin, B.zMin); }
+    else if (wallDir === 'east') { touch = Math.abs(B.xMin - A.xMax) < EPS; overlap = Math.min(A.zMax, B.zMax) - Math.max(A.zMin, B.zMin); }
+    if (touch && overlap > 0.3 && (!best || overlap > best.overlap)) {
+      best = { roomId: s.id, wall: OPP[wallDir], name: s.name, overlap };
+    }
+  }
+  return best;
 }
 
 // 텍스트월 스타일 필드 정규화 (P4) — 구 프로젝트 로드 시 기본값 채움.
@@ -132,6 +185,101 @@ export function ensureTextStyles(project) {
     r.introBodyStyle = makeTextStyle('secBody', r.introBodyStyle);
     r.introPanel = makePanel('introPanel', r.introPanel);
   }
+  return project;
+}
+
+// --- 자유 배치 텍스트 오브젝트 (v1.3 P4) --------------------------------------
+// role: 'title'(전시명 — meta 연동) | 'intro'(전시 서문 — meta.intro 연동)
+//     | 'section'(섹션 제목+서문 — room.name/intro 연동) | 'free'(자유 텍스트)
+// 역할 오브젝트는 "표시"만 담당 — 데이터(메타/룸 필드)는 그대로 유지된다.
+export const TEXT_FONTS = Object.freeze(['serif', 'sans', 'noto-sans', 'pretendard']);
+export const TEXT_SHADOWS = Object.freeze(['none', 'soft', 'drop', 'glow']);
+
+export function makeText(overrides = {}) {
+  const id = overrides.id || uid('tx');
+  return {
+    id,
+    role: overrides.role || 'free',
+    text: overrides.text || '',
+    placement: { wall: 'north', x: 2, centerHeightCm: 170, ...(overrides.placement || {}) },
+    widthCm: overrides.widthCm ?? 300,
+    style: { font: 'sans', weight: 500, italic: false, sizeCm: 10, color: '#F2E9DB',
+             letterSpacing: 0.02, lineHeight: 1.6, shadow: 'none', shadowColor: '',
+             ...(overrides.style || {}) },
+    ...(overrides.bodyStyle ? { bodyStyle: { italic: false, shadow: 'none', shadowColor: '', ...overrides.bodyStyle } } : {}),
+    panel: { align: 'center', bg: 'none', ...(overrides.panel || {}) },
+    light: { on: false, intensity: 1.2, temp: 'warm', ...(overrides.light || {}) },
+  };
+}
+
+// 텍스트 오브젝트 → 렌더 블록 목록 (viewer world.js + 에디터 정면뷰 공용).
+// space = 오브젝트가 속한 room 또는 lobby(래퍼 포함 — name/intro 필드 사용).
+export function textBlocks(project, space, t) {
+  const st = t.style || {};
+  if (t.role === 'title') {
+    const m = project.meta || {};
+    return [
+      { text: m.title || '', style: st, gapCm: 8 },
+      { text: m.subtitle || '', style: { ...st, sizeCm: (st.sizeCm || 28) * 0.42, weight: 400, shadow: st.shadow }, gapCm: 12 },
+      { text: m.curator ? `큐레이션 · ${m.curator}` : '', style: { ...st, sizeCm: (st.sizeCm || 28) * 0.3, weight: 400, color: '#B9A986' } },
+    ];
+  }
+  if (t.role === 'intro') return [{ text: project.meta?.intro || '', style: st }];
+  if (t.role === 'section') {
+    return [
+      { text: space?.name || '', style: st, gapCm: 5 },
+      { text: space?.intro || '', style: t.bodyStyle || st },
+    ];
+  }
+  return [{ text: t.text || '', style: st }];
+}
+
+// P4 마이그레이션: 고정 타이틀월/섹션 패널 → 자유 배치 텍스트 오브젝트.
+// lobby.texts 부재 시 1회 생성 (기존 표시 위치와 동등한 지점에 배치).
+export function ensureTexts(project) {
+  const lobby = project.lobby;
+  if (!lobby) return project;
+  if (lobby.texts) {
+    for (const r of (project.rooms || [])) if (!r.texts) r.texts = [];
+    return project;
+  }
+  const layout = computeLayout(project);
+  const lobbyW = layout.lobby ? (layout.lobby.xMax - layout.lobby.xMin) : (lobby.size?.w ?? 18);
+  lobby.texts = [
+    // 전시명 밴드 (구: 로비 북벽 문 위 중앙 고정)
+    makeText({
+      id: 'tx-title', role: 'title',
+      placement: { wall: 'north', x: +(lobbyW / 2).toFixed(2), centerHeightCm: 340 },
+      widthCm: Math.min(project.titlePanel?.widthCm ?? 900, Math.max(200, (lobbyW - 1) * 100)),
+      style: { italic: false, shadow: 'none', shadowColor: '', ...(project.titleStyle || TEXT_DEFAULTS.title) },
+      panel: { align: project.titlePanel?.align ?? 'center', bg: project.titlePanel?.bg ?? 'none' },
+      light: { ...TEXT_DEFAULTS.titlePanel.light, ...(project.titlePanel?.light || {}) },
+    }),
+    // 전시 서문 (구: 문 왼쪽 고정)
+    makeText({
+      id: 'tx-intro', role: 'intro',
+      placement: { wall: 'north', x: +(lobbyW / 2 - LAYOUT.DOOR_W / 2 - 2.1).toFixed(2), centerHeightCm: 155 },
+      widthCm: 340,
+      style: { italic: false, shadow: 'none', shadowColor: '', ...(project.introStyle || TEXT_DEFAULTS.body) },
+      panel: { align: 'left', bg: project.titlePanel?.bg ?? 'none' },
+      light: { on: false, intensity: 1.0, temp: 'warm' },
+    }),
+  ];
+  (project.rooms || []).forEach((r, i) => {
+    r.texts = r.texts || [];
+    const rect = layout.rooms?.[i]?.rect;
+    const len = rect ? wallLength(rect, 'east') : (r.size?.d ?? 9);
+    // 섹션 패널 (구: 동벽 남쪽 코너 1.8m 고정)
+    r.texts.push(makeText({
+      id: 'tx-sec-' + r.id, role: 'section',
+      placement: { wall: 'east', x: +(len - 1.8).toFixed(2), centerHeightCm: 160 },
+      widthCm: r.introPanel?.widthCm ?? 260,
+      style: { italic: false, shadow: 'none', shadowColor: '', ...(r.introTitleStyle || TEXT_DEFAULTS.secTitle) },
+      bodyStyle: { ...(r.introBodyStyle || TEXT_DEFAULTS.secBody) },
+      panel: { align: r.introPanel?.align ?? 'left', bg: r.introPanel?.bg ?? 'light' },
+      light: { on: false, intensity: 1.0, temp: 'warm', ...(r.introPanel?.light || {}) },
+    }));
+  });
   return project;
 }
 
@@ -160,7 +308,11 @@ export function makeArtwork(overrides = {}) {
 
 export function makeRoom(overrides = {}, index = 0) {
   const id = overrides.id || uid('room');
+  const wallFaces = overrides.wallFaces; // P3 면 단위 오버라이드 보존
   return {
+    ...(wallFaces ? { wallFaces } : {}),
+    ...(overrides.origin ? { origin: { x: overrides.origin.x, z: overrides.origin.z } } : {}), // P2 자유 배치 좌표
+    ...(overrides.texts ? { texts: overrides.texts } : {}), // P4 텍스트 오브젝트 보존
     id,
     name: overrides.name || `${index + 1}. 새 섹션`,
     intro: overrides.intro || '',
@@ -252,40 +404,52 @@ export function computeLayout(project) {
   out.spawn = { x: 0, z: lobby.zMax - 0.8, angle: 0 };
 
   const placed = []; // {id, rect}
-  // room[0]: 로비 북쪽에 붙임 (남쪽 벽 = 로비 북쪽 모서리 z=0), x 중심 0.
-  let prevRect = {
-    xMin: -rs[0].size.w / 2, xMax: rs[0].size.w / 2,
-    zMin: -rs[0].size.d, zMax: 0,
-  };
-  out.rooms.push({ id: rs[0].id, rect: prevRect, size: rs[0].size });
-  placed.push({ id: rs[0].id, rect: prevRect });
+  const useOrigins = rs.every(r => r.origin && typeof r.origin.x === 'number' && typeof r.origin.z === 'number');
 
-  for (let i = 1; i < rs.length; i++) {
-    const prev = rs[i - 1];
-    const exit = prev.exitDoor;
-    if (!exit) break; // 앞 룸에 출구 없음 → 체인 종료
-    const door = wallLeftToWorld(prevRect, exit.wall, exit.offset);
-    const [hx, hz] = HEADING[exit.wall] || HEADING.north;
-    const w = rs[i].size.w, d = rs[i].size.d;
-    let rect;
-    if (hz !== 0) {
-      // 진행 = 남/북. 깊이=Z, 폭=X(문 중심 기준).
-      if (hz < 0) { // north
-        rect = { xMin: door.x - w / 2, xMax: door.x + w / 2, zMin: prevRect.zMin - d, zMax: prevRect.zMin };
-      } else {      // south
-        rect = { xMin: door.x - w / 2, xMax: door.x + w / 2, zMin: prevRect.zMax, zMax: prevRect.zMax + d };
-      }
-    } else {
-      // 진행 = 동/서. 깊이=X, 폭=Z.
-      if (hx > 0) { // east
-        rect = { xMin: prevRect.xMax, xMax: prevRect.xMax + d, zMin: door.z - w / 2, zMax: door.z + w / 2 };
-      } else {      // west
-        rect = { xMin: prevRect.xMin - d, xMax: prevRect.xMin, zMin: door.z - w / 2, zMax: door.z + w / 2 };
-      }
+  if (useOrigins) {
+    // ── P2 자유 배치: room.origin(rect 북서 꼭짓점) + size 로 직접 배치 ──
+    for (const r of rs) {
+      const rect = { xMin: r.origin.x, xMax: r.origin.x + r.size.w, zMin: r.origin.z, zMax: r.origin.z + r.size.d };
+      out.rooms.push({ id: r.id, rect, size: r.size });
+      placed.push({ id: r.id, rect });
     }
-    out.rooms.push({ id: rs[i].id, rect, size: rs[i].size, doorWorld: door });
-    placed.push({ id: rs[i].id, rect });
-    prevRect = rect;
+  } else {
+    // ── 레거시(v2 이전) 체인 배치: exitDoor 방향으로 이어붙임 (ensureOrigins 마이그레이션용) ──
+    // room[0]: 로비 북쪽에 붙임 (남쪽 벽 = 로비 북쪽 모서리 z=0), x 중심 0.
+    let prevRect = {
+      xMin: -rs[0].size.w / 2, xMax: rs[0].size.w / 2,
+      zMin: -rs[0].size.d, zMax: 0,
+    };
+    out.rooms.push({ id: rs[0].id, rect: prevRect, size: rs[0].size });
+    placed.push({ id: rs[0].id, rect: prevRect });
+
+    for (let i = 1; i < rs.length; i++) {
+      const prev = rs[i - 1];
+      const exit = prev.exitDoor;
+      if (!exit) break; // 앞 룸에 출구 없음 → 체인 종료
+      const door = wallLeftToWorld(prevRect, exit.wall, exit.offset);
+      const [hx, hz] = HEADING[exit.wall] || HEADING.north;
+      const w = rs[i].size.w, d = rs[i].size.d;
+      let rect;
+      if (hz !== 0) {
+        // 진행 = 남/북. 깊이=Z, 폭=X(문 중심 기준).
+        if (hz < 0) { // north
+          rect = { xMin: door.x - w / 2, xMax: door.x + w / 2, zMin: prevRect.zMin - d, zMax: prevRect.zMin };
+        } else {      // south
+          rect = { xMin: door.x - w / 2, xMax: door.x + w / 2, zMin: prevRect.zMax, zMax: prevRect.zMax + d };
+        }
+      } else {
+        // 진행 = 동/서. 깊이=X, 폭=Z.
+        if (hx > 0) { // east
+          rect = { xMin: prevRect.xMax, xMax: prevRect.xMax + d, zMin: door.z - w / 2, zMax: door.z + w / 2 };
+        } else {      // west
+          rect = { xMin: prevRect.xMin - d, xMax: prevRect.xMin, zMin: door.z - w / 2, zMax: door.z + w / 2 };
+        }
+      }
+      out.rooms.push({ id: rs[i].id, rect, size: rs[i].size, doorWorld: door });
+      placed.push({ id: rs[i].id, rect });
+      prevRect = rect;
+    }
   }
 
   // 겹침 검사 (인접 룸의 공유 모서리는 면적 0 → 무시). 로비도 포함.
@@ -308,6 +472,61 @@ export function computeLayout(project) {
   }
   out.bounds = { xMin, xMax, zMin, zMax };
   return out;
+}
+
+// --- P2 마이그레이션: 문 체인 배치 → 자유 배치(origin) -----------------------
+// 모든 룸에 origin 이 없으면 레거시 체인 레이아웃을 1회 계산해 origin 으로 기록.
+// east/west 진행 룸은 체인 배치에서 rect 가 (d,w)로 축회전되므로 size 도 실측 축으로 정규화
+// (rect 는 기존과 동일 → 작품/문 위치·외관 변화 없음).
+export function ensureOrigins(project) {
+  const rs = project.rooms || [];
+  if (!rs.length || rs.every(r => r.origin && typeof r.origin.x === 'number')) return project;
+  const layout = computeLayout(project); // origin 미비 → 체인 브랜치로 계산됨
+  let east = layout.bounds ? layout.bounds.xMax + 2 : 0; // 체인이 끊긴 룸 폴백 배치 커서
+  rs.forEach((r, i) => {
+    if (r.origin && typeof r.origin.x === 'number') return;
+    const rect = layout.rooms[i]?.rect;
+    if (rect) {
+      r.origin = { x: +rect.xMin.toFixed(3), z: +rect.zMin.toFixed(3) };
+      r.size.w = +(rect.xMax - rect.xMin).toFixed(3);
+      r.size.d = +(rect.zMax - rect.zMin).toFixed(3);
+    } else {
+      // 체인 미배치 룸(비정상 데이터): 전체 영역 동쪽에 임시 배치
+      r.origin = { x: east, z: -r.size.d };
+      east += r.size.w + 2;
+    }
+  });
+  return project;
+}
+
+// --- P2: 문 유효성 — 문 스팬이 경계선 반대편 인접 공간으로 완전히 덮이는가 ----
+// selfId: '__lobby__' 또는 room id. 벽 범위를 벗어난 문도 무효.
+export function doorCovered(layout, selfId, wall, offset, doorW = LAYOUT.DOOR_W) {
+  const rect = selfId === '__lobby__' ? layout.lobby : layout.rooms.find(r => r.id === selfId)?.rect;
+  if (!rect || typeof offset !== 'number') return false;
+  const len = wallLength(rect, wall);
+  const EPS = 1e-3;
+  if (offset - doorW / 2 < -EPS || offset + doorW / 2 > len + EPS) return false;
+  const a = wallLeftToWorld(rect, wall, offset - doorW / 2);
+  const b = wallLeftToWorld(rect, wall, offset + doorW / 2);
+  const horizontal = (wall === 'north' || wall === 'south');
+  const lo = horizontal ? Math.min(a.x, b.x) : Math.min(a.z, b.z);
+  const hi = horizontal ? Math.max(a.x, b.x) : Math.max(a.z, b.z);
+  const fixed = horizontal ? a.z : a.x;
+  const spaces = [{ id: '__lobby__', rect: layout.lobby }, ...layout.rooms.map(r => ({ id: r.id, rect: r.rect }))];
+  for (const s of spaces) {
+    if (s.id === selfId || !s.rect) continue;
+    const R = s.rect;
+    let touch = false;
+    if (wall === 'north') touch = Math.abs(R.zMax - fixed) < EPS;
+    else if (wall === 'south') touch = Math.abs(R.zMin - fixed) < EPS;
+    else if (wall === 'west') touch = Math.abs(R.xMax - fixed) < EPS;
+    else if (wall === 'east') touch = Math.abs(R.xMin - fixed) < EPS;
+    if (!touch) continue;
+    const rlo = horizontal ? R.xMin : R.zMin, rhi = horizontal ? R.xMax : R.zMax;
+    if (rlo <= lo + EPS && rhi >= hi - EPS) return true;
+  }
+  return false;
 }
 
 // --- 검증 -------------------------------------------------------------------
@@ -357,12 +576,14 @@ export function validateProject(project) {
     if (!isLast && !r.exitDoor) errors.push(`${tag}: 마지막이 아닌 룸에는 exitDoor 가 필요합니다.`);
     if (r.exitDoor) {
       if (!PRESETS.wallDir.includes(r.exitDoor.wall)) errors.push(`${tag}: exitDoor.wall 값이 잘못되었습니다.`);
-      // 실제 배치 rect 기준 벽 길이 (레이아웃이 없으면 size 기반 근사)
+      // P2: 문 유효성은 경고(자동 삭제/차단 금지). 무효 문은 뷰어에서 개구부가 생성되지 않는다.
       const lrect = layout?.rooms?.[i]?.rect;
       const len = lrect ? wallLength(lrect, r.exitDoor.wall)
         : ((r.exitDoor.wall === 'north' || r.exitDoor.wall === 'south') ? r.size?.w : r.size?.d);
       if (typeof r.exitDoor.offset !== 'number' || r.exitDoor.offset < LAYOUT.DOOR_W / 2 || r.exitDoor.offset > len - LAYOUT.DOOR_W / 2) {
-        errors.push(`${tag}: exitDoor.offset(${r.exitDoor.offset})가 벽 안(문폭 여유 포함)에 들어오지 않습니다.`);
+        warnings.push(`${tag}: 출구 문이 벽 범위를 벗어났습니다 — 문 위치를 조정하세요.`);
+      } else if (layout && !doorCovered(layout, r.id, r.exitDoor.wall, r.exitDoor.offset)) {
+        warnings.push(`${tag}: 출구 문이 인접 공간과 맞닿지 않습니다 — 개구부가 생성되지 않습니다.`);
       }
     }
     (r.artworks || []).forEach((aw) => {
@@ -379,6 +600,10 @@ export function validateProject(project) {
   if (layout) {
     for (const ov of layout.overlaps) {
       errors.push(`공간 겹침: '${ov.a}' 와 '${ov.b}' 가 겹칩니다. 룸 크기/순서/문 위치를 조정하세요.`);
+    }
+    // P2: 로비 입장 문(북쪽 중앙 고정)이 룸으로 이어지는지
+    if (layout.lobby && !doorCovered(layout, '__lobby__', 'north', (layout.lobby.xMax - layout.lobby.xMin) / 2)) {
+      warnings.push('로비 입장 문(북쪽 중앙)이 어떤 룸과도 맞닿지 않습니다 — 룸을 로비 북쪽 문 앞에 붙여주세요.');
     }
   }
 

@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>빈센트 반고흐  영혼의 그림자</title>
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="빈센트 반고흐  영혼의 그림자">
+  <meta property="og:description" content="우리가 영원히 사랑하는 작가 ">
+  
+  <meta property="og:image" content="data/assets/thumbs/aw-zlgcw4.webp">
+  <meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="viewer/css/viewer.css">
+</head>
+<body>
+  <canvas id="scene"></canvas>
+
+  <!-- 로딩 화면 -->
+  <div id="loading" class="overlay">
+    <div class="load-title" id="load-title">미술관을 준비하는 중…</div>
+    <div class="load-bar"><div class="load-fill" id="load-fill"></div></div>
+    <div class="load-pct" id="load-pct">0%</div>
+  </div>
+
+  <!-- HUD 루트 (hud.js 가 채움) -->
+  <div id="hud"></div>
+
+  <script type="module" src="viewer/js/main.js"></script>
+</body>
+</html>

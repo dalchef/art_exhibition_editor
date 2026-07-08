@@ -111,7 +111,7 @@ export class HUD {
       label.className = 'cs-name';
       label.textContent = AVATAR_PRESETS[keyName].displayName;
       labels.appendChild(label);
-      this._csAvatars[keyName] = { av, label, x: X[i] };
+      this._csAvatars[keyName] = { av, label, blob, x: X[i] };
     });
 
     // 선택/스와이프 입력
@@ -151,7 +151,19 @@ export class HUD {
       fx.width = w; fx.height = h;
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
-      camera.position.set(0, 1.15, 4.9);
+      // P5: 모바일 세로 화면 — 라인업 간격 압축 + 카메라 거리 자동 피팅으로
+      // 4캐릭터(부루/보리/모아/새롬)가 스크롤 없이 모두 보이고 탭 선택 가능하게.
+      const portrait = camera.aspect < 0.95;
+      const f = portrait ? 0.62 : 1;
+      PRESET_KEYS.forEach((k, i) => {
+        const rec = this._csAvatars[k];
+        rec.x = X[i] * f;
+        rec.av.position.x = rec.x;
+        if (rec.blob) rec.blob.position.x = rec.x;
+      });
+      const halfExtent = 2.05 * f + 0.75; // 라인업 좌우 끝 + 여백
+      const dist = Math.max(4.9, halfExtent / (Math.tan((38 / 2) * Math.PI / 180) * camera.aspect));
+      camera.position.set(0, 1.15, dist);
       camera.lookAt(0, 0.82, 0);
     };
     resize();
@@ -269,8 +281,8 @@ export class HUD {
   _showHelp(onStart) {
     const touch = this.isMobile || (navigator.maxTouchPoints || 0) > 0 && /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
     const rows = touch
-      ? [['조이스틱', '이동'], ['화면 드래그', '시점 회전'], ['프롬프트 탭', '작품 자세히 보기'], ['닫기 버튼', '돌아가기']]
-      : [['WASD / ←↑↓→', '이동'], ['Shift', '달리기'], ['마우스 드래그', '시점 회전'], ['E', '작품 자세히 보기'], ['ESC', '닫기'],
+      ? [['조이스틱', '이동'], ['화면 드래그', '시점 회전 (상하 포함)'], ['두 손가락 핀치', '카메라 거리 줌'], ['프롬프트 탭', '작품 자세히 보기'], ['닫기 버튼', '돌아가기']]
+      : [['WASD / ←↑↓→', '이동'], ['Shift', '달리기'], ['마우스 드래그', '시점 회전 (상하 포함)'], ['휠', '카메라 거리 줌'], ['E', '작품 자세히 보기'], ['ESC', '닫기'],
          ['H', '화면 UI 숨기기(녹화용)'], ['T', '시계 표시'], ['P', '자동 도슨트 워크']];
     const pop = document.createElement('div');
     pop.className = 'help-pop';
@@ -290,6 +302,8 @@ export class HUD {
   }
 
   _enter() {
+    // 마지막 선택 저장 (P1 임베드 프리뷰가 "마지막 선택 아바타"로 즉시 입장할 때 사용)
+    try { localStorage.setItem('museum-avatar-last', JSON.stringify(this.sel)); } catch (e) { /* 무시 */ }
     // 라인업 정리
     cancelAnimationFrame(this._csRaf);
     window.removeEventListener('resize', this._csResize);
@@ -308,8 +322,8 @@ export class HUD {
     const hint = document.createElement('div');
     hint.className = 'ingame-hint';
     hint.innerHTML = this.isMobile
-      ? `왼쪽 조이스틱으로 이동 · 화면 드래그로 시점`
-      : `<b>WASD</b> 이동 · <b>드래그</b> 시점 · <b>E</b> 자세히 · <b>H</b> UI숨김 · <b>T</b> 시계`;
+      ? `왼쪽 조이스틱으로 이동 · 화면 드래그로 시점 · 핀치로 줌`
+      : `<b>WASD</b> 이동 · <b>드래그</b> 시점 · <b>휠</b> 줌 · <b>E</b> 자세히 · <b>H</b> UI숨김 · <b>T</b> 시계`;
     hud.appendChild(hint);
     this.hint = hint;
 

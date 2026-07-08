@@ -225,7 +225,7 @@ export function wallStyleCanvas(style, imageEl) {
 
 // 벽 스타일 텍스처 (캐시). 커스텀 이미지는 imageEl 로 사전 로드되어 있어야 함.
 export function wallStyleTexture(style, imageEl) {
-  const key = 'wallS:' + JSON.stringify([style.color, style.pattern, style.patternOpacity, style.patternScale, !!imageEl, imageEl?.src?.slice(-24)]);
+  const key = 'wallS:' + JSON.stringify([style.color, style.pattern, style.patternOpacity, style.patternScale, !!style.patternMirror, !!imageEl, imageEl?.src?.slice(-24)]);
   if (_cache.has(key)) return _cache.get(key);
   const { canvas: cv, tileM } = wallStyleCanvas(style, imageEl);
   const tex = new THREE.CanvasTexture(cv);
@@ -254,18 +254,33 @@ export function floorStyleTexture(floorDef, imageEl) {
   return { tex: floorTexture(floorDef?.preset || 'walnut-herringbone'), tileM: 1.15 };
 }
 
-// ---- 텍스트월 스타일 렌더 (v1.2 P4) ----------------------------------------
-// blocks: [{ text, style:{font,weight,sizeCm,color,letterSpacing,lineHeight}, gapCm? }]
+// ---- 텍스트월 스타일 렌더 (v1.2 P4 / v1.3 P4 확장) ---------------------------
+// blocks: [{ text, style:{font,weight,italic,sizeCm,color,letterSpacing,lineHeight,shadow,shadowColor}, gapCm? }]
 // panel:  { align, bg, widthCm }
-// 반환 { texture, wM, hM } — 벽면 실측 크기(m) 포함. 장변 2048px 고해상 canvas.
+// styledTextCanvas → { canvas, wM, hM } (에디터 정면뷰 공용) / styledTextTexture → THREE 텍스처 래핑.
 // ctx.letterSpacing 미지원 브라우저는 글자 단위 수동 렌더로 폴백(실측 감지).
-const FONT_FAMILY = { serif: `'Noto Serif KR', 'Pretendard', serif`, sans: `'Pretendard', sans-serif` };
+const FONT_FAMILY = {
+  serif: `'Noto Serif KR', 'Pretendard', serif`,          // 명조
+  sans: `'Pretendard', sans-serif`,                        // 고딕(기본)
+  'noto-sans': `'Noto Sans KR', 'Pretendard', sans-serif`, // v1.3 P4
+  pretendard: `'Pretendard', sans-serif`,                  // v1.3 P4 (명시 선택지)
+};
 const PANEL_BG = { none: null, light: 'rgba(245,238,225,0.94)', dark: 'rgba(24,18,14,0.92)' };
 const _lsSupported = (() => {
   try { return 'letterSpacing' in CanvasRenderingContext2D.prototype; } catch (e) { return false; }
 })();
 
-export function styledTextTexture({ blocks, panel }) {
+// 그림자 프리셋 (v1.3 P4): 글자 크기(px) 비례
+function applyShadow(g, st, px) {
+  const kind = st.shadow || 'none';
+  if (kind === 'soft') { g.shadowColor = st.shadowColor || 'rgba(0,0,0,0.55)'; g.shadowOffsetX = px * 0.04; g.shadowOffsetY = px * 0.07; g.shadowBlur = px * 0.18; }
+  else if (kind === 'drop') { g.shadowColor = st.shadowColor || 'rgba(0,0,0,0.85)'; g.shadowOffsetX = px * 0.05; g.shadowOffsetY = px * 0.05; g.shadowBlur = 0; }
+  else if (kind === 'glow') { g.shadowColor = st.shadowColor || '#FFD9A0'; g.shadowOffsetX = 0; g.shadowOffsetY = 0; g.shadowBlur = px * 0.35; }
+  else { g.shadowColor = 'rgba(0,0,0,0)'; g.shadowOffsetX = 0; g.shadowOffsetY = 0; g.shadowBlur = 0; }
+}
+const fontStr = (st, px) => `${st.italic ? 'italic ' : ''}${st.weight || 400} ${px}px ${FONT_FAMILY[st.font] || FONT_FAMILY.sans}`;
+
+export function styledTextCanvas({ blocks, panel }) {
   const wM = Math.max(0.4, (panel.widthCm || 300) / 100);
   const pxPerM = Math.min(2048 / wM, 700);
   const W = Math.round(wM * pxPerM);
@@ -281,7 +296,7 @@ export function styledTextTexture({ blocks, panel }) {
     const st = b.style;
     const px = Math.max(6, (st.sizeCm / 100) * pxPerM);
     const ls = (st.letterSpacing || 0) * px;
-    meas.font = `${st.weight || 400} ${px}px ${FONT_FAMILY[st.font] || FONT_FAMILY.sans}`;
+    meas.font = fontStr(st, px);
     const wordW = (t) => meas.measureText(t).width + ls * Math.max(0, t.length - (_lsSupported ? 0 : 1));
     const lines = [];
     for (const para of String(b.text).split('\n')) {
@@ -320,8 +335,9 @@ export function styledTextTexture({ blocks, panel }) {
   const align = panel.align || 'left';
   let y = padPx;
   for (const lo of laidOut) {
-    g.font = `${lo.st.weight || 400} ${lo.px}px ${FONT_FAMILY[lo.st.font] || FONT_FAMILY.sans}`;
+    g.font = fontStr(lo.st, lo.px);
     g.fillStyle = lo.st.color || '#e8e0d0';
+    applyShadow(g, lo.st, lo.px); // 그림자 프리셋 (v1.3 P4)
     if (_lsSupported) g.letterSpacing = lo.ls + 'px';
     for (const line of lo.lines) {
       const lw = g.measureText(line).width + (_lsSupported ? 0 : lo.ls * Math.max(0, line.length - 1));
@@ -338,11 +354,17 @@ export function styledTextTexture({ blocks, panel }) {
     if (_lsSupported) g.letterSpacing = '0px';
     y += lo.gapPx;
   }
+  applyShadow(g, {}, 0); // 그림자 리셋
 
+  return { canvas: cv, wM, hM: H / pxPerM };
+}
+
+export function styledTextTexture({ blocks, panel }) {
+  const { canvas: cv, wM, hM } = styledTextCanvas({ blocks, panel });
   const tex = new THREE.CanvasTexture(cv);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 4;
-  return { texture: tex, wM, hM: H / pxPerM };
+  return { texture: tex, wM, hM };
 }
 
 // 텍스트 라벨(명제판·타이틀월·서문 패널)을 canvas 로 렌더 → 텍스처 --------
