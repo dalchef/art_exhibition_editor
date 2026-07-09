@@ -410,7 +410,6 @@ function renderRoute() {
 // ---- 룸 스트립 ----
 function bindStrip() {
   $('#btn-add-room').addEventListener('click', () => {
-    if (store.project.rooms.length >= RANGES.rooms[1]) { toast(`룸은 최대 ${RANGES.rooms[1]}개입니다.`, true); return; }
     store.mutate(p => {
       // P2 자유 배치: 마지막 룸 주변 빈 자리(북→동→서→남)에 자동 배치 + 맞닿는 벽 중앙에 문 자동 설정
       const layout = computeLayout(p);

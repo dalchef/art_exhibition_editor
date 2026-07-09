@@ -37,7 +37,7 @@ export const LAYOUT = Object.freeze({
 export const RANGES = Object.freeze({
   // P2: 자유 배치 마이그레이션에서 east/west 진행 룸의 w/d 가 실측 축으로 정규화되므로 d 상한을 w 와 동일하게.
   roomW: [6, 20], roomD: [6, 20], roomH: [3.5, 5],
-  rooms: [2, 5],
+  rooms: [2, Infinity], // 상한 없음 (v1.3 이후 — 자유 배치라 개수 제한 불필요)
   spotIntensity: [0.5, 2.0],
 });
 
@@ -556,8 +556,8 @@ export function validateProject(project) {
   }
 
   const rooms = project.rooms || [];
-  if (!inRange(rooms.length, RANGES.rooms)) {
-    errors.push(`룸 개수는 ${RANGES.rooms[0]}~${RANGES.rooms[1]}개여야 합니다 (현재 ${rooms.length}).`);
+  if (rooms.length < RANGES.rooms[0]) {
+    errors.push(`룸은 최소 ${RANGES.rooms[0]}개여야 합니다 (현재 ${rooms.length}).`);
   }
 
   // 레이아웃을 먼저 계산해 실제 배치 rect 로 벽 길이를 구한다.
