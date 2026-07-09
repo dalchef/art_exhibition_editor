@@ -4,8 +4,9 @@ import { LibraryPanel } from './libraryPanel.js';
 import { Inspector } from './inspector.js';
 import { PlanView } from './planView.js';
 import { ElevationView } from './elevationView.js';
-import { PRESETS, RANGES, LOBBY_RANGES, makeRoom, computeLayout, wallLength, LAYOUT } from '../../shared/schema.js';
+import { PRESETS, RANGES, LOBBY_RANGES, makeRoom, makeText, computeLayout, wallLength, LAYOUT, findOppositeFace } from '../../shared/schema.js';
 import { openPreview } from './previewBridge.js';
+import { LivePreview } from './livePreview.js';
 import { exportPublishZip } from './exporter.js';
 import { openApiSearch } from './apiSearch.js';
 
@@ -27,7 +28,9 @@ async function main() {
   plan = new PlanView(store, $('#canvas-host'), { onWallPick: () => setMode('elevation') });
   elev = new ElevationView(store, $('#canvas-host'));
   elev.deactivate();
-  window.__views = { plan, elev };
+  const live = new LivePreview(store, { onPaneResize: () => renderCanvas() }); // P1 스플릿 3D 프리뷰
+  buildFaceBar(); // P3 정면뷰 면 소속 표시 + 반대면 전환
+  window.__views = { plan, elev, live };
 
   bindTopbar();
   bindTabs();
@@ -36,8 +39,13 @@ async function main() {
   bindKeys();
 
   store.on('load', () => { renderAll(); });
+  // P8-2: 미저장 변경(자동 저장 대기 중) 상태에서 탭 닫기/새로고침 경고
+  window.addEventListener('beforeunload', (e) => {
+    if (isDirty) { e.preventDefault(); e.returnValue = ''; }
+  });
+  if (store.restoredFromSave) showRestoreDialog(); // P8-2: 재진입 복구 확인
   store.on('change', () => { renderCanvas(); renderStrip(); renderRoute(); markDirty(true); });
-  store.on('select', () => { renderRoomProps(); renderAtmosphere(); renderStrip(); });
+  store.on('select', () => { renderRoomProps(); renderAtmosphere(); renderStrip(); renderFaceBar(); renderCanvas(); });
   store.on('saved', () => markDirty(false));
   store.on('dirty', () => markDirty(true));
   store.on('undoredo', () => renderAll());
@@ -50,7 +58,7 @@ function renderAll() {
   $('#proj-title').value = store.project.meta.title || '';
   renderCanvas(); renderRoomProps(); renderAtmosphere(); renderRoute(); renderStrip(); updateUndoBtns();
 }
-function renderCanvas() { (mode === 'plan' ? plan : elev).resize(); }
+function renderCanvas() { (mode === 'plan' ? plan : elev).resize(); renderFaceBar(); }
 
 // ---- 모드 전환 ----
 function bindModes() {
@@ -63,11 +71,55 @@ function setMode(m) {
   if (m === 'plan') { elev.deactivate(); plan.activate(); }
   else { plan.deactivate(); elev.activate(); }
   updateModeHint();
+  renderAtmosphere(); // P3: 정면뷰 = 면 단위 편집, 평면도 = 룸 일괄 편집
+  renderFaceBar();
+}
+
+// ---- P3: 정면뷰 면 소속 바 ("룸 1 — 북쪽 벽 (안쪽 면)" + 반대면 전환) ----
+const DIR_KO = { north: '북쪽', south: '남쪽', east: '동쪽', west: '서쪽' };
+let faceBar = null;
+function buildFaceBar() {
+  faceBar = document.createElement('div');
+  faceBar.id = 'face-bar';
+  faceBar.style.display = 'none';
+  $('#canvas-host').appendChild(faceBar);
+}
+function renderFaceBar() {
+  if (!faceBar) return;
+  const room = store.selectedRoom;
+  if (mode !== 'elevation' || !room) { faceBar.style.display = 'none'; return; }
+  const dir = store.selection.wall || 'north';
+  const layout = computeLayout(store.project);
+  const rect = room.id === '__lobby__' ? layout.lobby : layout.rooms.find(r => r.id === room.id)?.rect;
+  const len = rect ? +wallLength(rect, dir).toFixed(1) : room.size.w;
+  const opp = findOppositeFace(store.project, room.id, dir, layout);
+  faceBar.style.display = 'flex';
+  faceBar.innerHTML = `
+    <span class="fb-id"><b>${attr(room.name)}</b> — ${DIR_KO[dir]} 벽 (안쪽 면) · ${len}m × ${room.size.h}m</span>
+    ${opp ? `<button class="fb-flip">반대면 편집 → ${attr(opp.name)} 쪽</button>`
+          : '<span class="fb-ext">반대면: 외벽(exterior)</span>'}
+    <button class="fb-addtext" title="이 벽면에 자유 텍스트 추가">＋ 텍스트</button>`;
+  faceBar.querySelector('.fb-flip')?.addEventListener('click', () => {
+    store.select({ roomId: opp.roomId, wall: opp.wall, artworkId: null, textId: null, textWall: null });
+    renderCanvas();
+  });
+  // P4: 순수 자유 텍스트 오브젝트 추가
+  faceBar.querySelector('.fb-addtext')?.addEventListener('click', () => {
+    const nt = makeText({ role: 'free', text: '새 텍스트', placement: { wall: dir, x: +(len / 2).toFixed(2), centerHeightCm: 200 } });
+    store.mutate(p => {
+      const r = roomRef(p, room.id);
+      if (!r) return;
+      r.texts = r.texts || [];
+      r.texts.push(nt);
+    }, { detail: {} });
+    store.select({ textId: nt.id, artworkId: null });
+    renderCanvas();
+  });
 }
 function updateModeHint() {
   $('#mode-hint').textContent = mode === 'plan'
-    ? '룸 클릭 = 선택 · 벽 클릭 = 정면뷰 진입 · 문 핸들 드래그 = 위치 이동'
-    : `${store.selection.wall || ''} 벽 · 보관함에서 드래그해 걸기 · 작품 드래그로 이동(150cm 스냅)`;
+    ? '룸 클릭 = 선택 · 활성 룸 벽 호버+클릭 = 정면뷰 · 룸 드래그 = 이동 · 핸들 = 크기 · ESC = 해제'
+    : `보관함에서 드래그해 걸기 · 드래그 이동 = 스마트 가이드 스냅 (Alt = 해제) · ESC = 평면도`;
 }
 
 // ---- 탭 ----
@@ -96,7 +148,8 @@ function bindTopbar() {
   });
 }
 function updateUndoBtns() { $('#btn-undo').disabled = !store.canUndo(); $('#btn-redo').disabled = !store.canRedo(); }
-function markDirty(d) { const el = $('#save-state'); el.textContent = d ? '저장 중…' : '저장됨'; el.classList.toggle('dirty', d); updateUndoBtns(); }
+let isDirty = false; // P8-2: beforeunload 경고 판단
+function markDirty(d) { isDirty = d; const el = $('#save-state'); el.textContent = d ? '저장 중…' : '저장됨'; el.classList.toggle('dirty', d); updateUndoBtns(); }
 
 async function doSaveProject() {
   await store.save();
@@ -107,8 +160,59 @@ async function doSaveProject() {
 async function doPublish() {
   const v = store.validate();
   if (!v.ok) { toast('검증 오류: ' + v.errors[0], true); return; }
-  try { await store.save(); await exportPublishZip(store); toast('Publish ZIP 을 생성했습니다.'); }
+  // P8-4: og:image 절대 URL 생성용 배포 예정 URL 입력 (미입력 = 상대 경로 유지)
+  const baseUrl = await showPublishDialog();
+  if (baseUrl === null) return; // 취소
+  store.mutate(p => { p.meta.deployUrl = baseUrl; }, { detail: { silent: true }, noUndo: true });
+  try { await store.save(); await exportPublishZip(store, { baseUrl }); toast('Publish ZIP 을 생성했습니다.'); }
   catch (err) { toast('Publish 실패: ' + err.message, true); console.error(err); }
+}
+
+// P8-4: 배포 URL 입력 다이얼로그. resolve: 취소=null · 미입력=''(상대 경로) · 입력=URL
+function showPublishDialog() {
+  return new Promise((resolve) => {
+    const pop = document.createElement('div');
+    pop.className = 'ed-modal';
+    pop.innerHTML = `
+      <div class="ed-card">
+        <div class="ed-title">Publish — 배포 예정 URL</div>
+        <div class="ed-body">카카오톡 등 공유 미리보기(og:image)에는 <b>절대 URL</b>이 필요합니다.<br>
+          미입력 시 상대 경로로 유지됩니다 — 사이트는 정상 동작하지만 공유 카드에 이미지가 표시되지 않을 수 있습니다.</div>
+        <input class="ed-input" type="text" placeholder="예: https://username.github.io/my-museum/"
+               value="${attr(store.project.meta.deployUrl || '')}">
+        <div class="ed-actions">
+          <button class="tb-btn" data-m="cancel">취소</button>
+          <button class="tb-btn accent" data-m="go">ZIP 생성</button>
+        </div>
+      </div>`;
+    document.body.appendChild(pop);
+    const done = (val) => { pop.remove(); resolve(val); };
+    pop.querySelector('[data-m=cancel]').addEventListener('click', () => done(null));
+    pop.querySelector('[data-m=go]').addEventListener('click', () => done(pop.querySelector('.ed-input').value.trim()));
+  });
+}
+
+// P8-2: 재진입 시 자동 저장본 복구 확인 다이얼로그
+function showRestoreDialog() {
+  const pop = document.createElement('div');
+  pop.className = 'ed-modal';
+  pop.innerHTML = `
+    <div class="ed-card">
+      <div class="ed-title">자동 저장된 작업이 있습니다</div>
+      <div class="ed-body">"${attr(store.project.meta.title || '제목 없음')}" 작업을 불러왔습니다. 이어서 편집할까요?</div>
+      <div class="ed-actions">
+        <button class="tb-btn" data-m="new">새 프로젝트 시작</button>
+        <button class="tb-btn primary" data-m="keep">이어서 하기</button>
+      </div>
+    </div>`;
+  document.body.appendChild(pop);
+  pop.querySelector('[data-m=keep]').addEventListener('click', () => pop.remove());
+  pop.querySelector('[data-m=new]').addEventListener('click', async () => {
+    if (!window.confirm('자동 저장된 작업과 이미지가 모두 삭제됩니다. 새로 시작할까요?')) return;
+    await store.resetProject();
+    pop.remove();
+    toast('새 프로젝트로 시작합니다.');
+  });
 }
 
 // 룸/로비 공용 참조 (mutate 콜백 안에서 사용)
@@ -184,11 +288,17 @@ function renderAtmosphere() {
   if (!room) { root.innerHTML = '<div class="inspector-empty">룸을 선택하세요.</div>'; return; }
   const decorRows = Object.keys(room.decor).map(k =>
     `<div class="toggle-row"><label>${DECOR_LABELS[k] || k}</label><div class="switch ${room.decor[k] ? 'on' : ''}" data-decor="${k}"></div></div>`).join('');
-  const W = room.wall, F = room.floor;
+  // P3: 정면뷰 = 진입한 벽의 "이 룸 쪽 면"만 편집, 평면도 = 룸 일괄(개별 면 오버라이드 제거)
+  const faceMode = mode === 'elevation';
+  const wallDir = store.selection.wall || 'north';
+  const hasOverride = faceMode && !!(room.wallFaces && room.wallFaces[wallDir]);
+  const W = faceMode ? ((room.wallFaces || {})[wallDir] || room.wall) : room.wall;
+  const F = room.floor;
   const PATTERN_LABELS = { damask: '다마스크', stripes: '줄무늬', plaster: '플라스터', fabric: '패브릭', dots: '도트', plain: '민무늬', custom: '커스텀' };
   const patternOpts = ['damask', 'stripes', 'plaster', 'fabric', 'dots', 'plain', ...(W.patternAsset ? ['custom'] : [])];
   root.innerHTML = `
-    <div class="swatch-group"><h4>벽 색 (P5 자유 색)</h4>
+    <div class="swatch-group"><h4>${faceMode ? `벽 색 — ${DIR_KO[wallDir]} 벽면만` : '벽 색 (룸 전체 일괄)'}</h4>
+    ${faceMode ? `<div class="hint-note" style="margin:-4px 0 8px">${attr(room.name)} 쪽 면에만 적용 — 반대쪽 면은 영향 없음${hasOverride ? ' · <b style="color:var(--accent)">개별 지정됨</b>' : ''}</div>` : ''}
       <div class="field-row" style="align-items:center;gap:6px">
         <input type="color" data-wall-color value="${W.color}" style="width:40px;height:30px;border:none;border-radius:6px;background:none;cursor:pointer">
         <input type="text" data-wall-hex value="${W.color}" style="flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:6px;color:var(--ink);padding:6px 8px;font-size:12px">
@@ -206,6 +316,7 @@ function renderAtmosphere() {
         <input type="range" data-wall-scale min="0.25" max="4" step="0.25" value="${W.patternScale}"></div>
       <div class="toggle-row"><label>미러 반복(이음매 완화)</label><div class="switch ${W.patternMirror ? 'on' : ''}" data-wall-mirror></div></div>
       <label class="lib-browse" style="display:block;text-align:center;margin-top:6px;font-size:12px">패턴 이미지 업로드<input type="file" accept="image/*" data-wall-upload hidden></label>
+      ${faceMode && hasOverride ? '<button class="tb-btn" data-face-reset style="width:100%;margin-top:8px;font-size:12px">이 면 개별 스타일 제거 (룸 기본값 사용)</button>' : ''}
     </div>
     <div class="swatch-group"><h4>바닥</h4>
       <div class="swatches">${Object.entries(FLOOR_SWATCH).map(([k, c]) =>
@@ -224,14 +335,26 @@ function renderAtmosphere() {
   const upd = (fn, rerender = true) => { store.mutate(p => { const r = roomRef(p, room.id); if (r) fn(r); }, { detail: {} }); if (rerender) renderAtmosphere(); };
   const updQuiet = (fn, coalesce) => store.mutate(p => { const r = roomRef(p, room.id); if (r) fn(r); }, { detail: { silent: true }, coalesce });
 
-  root.querySelector('[data-wall-color]').addEventListener('input', e => { updQuiet(r => { r.wall.color = e.target.value; }, 'wallcolor:' + room.id); root.querySelector('[data-wall-hex]').value = e.target.value; });
-  root.querySelector('[data-wall-hex]').addEventListener('change', e => { const v = e.target.value.trim(); if (/^#[0-9a-fA-F]{6}$/.test(v)) upd(r => { r.wall.color = v; }); });
-  root.querySelectorAll('[data-wall-quick]').forEach(el => el.addEventListener('click', () => upd(r => { r.wall.color = el.dataset.wallQuick; })));
-  root.querySelector('[data-wall-pattern]').addEventListener('change', e => upd(r => { r.wall.pattern = e.target.value; }));
-  root.querySelector('[data-wall-op]').addEventListener('input', e => updQuiet(r => { r.wall.patternOpacity = parseFloat(e.target.value); }, 'wallop:' + room.id));
-  root.querySelector('[data-wall-scale]').addEventListener('input', e => updQuiet(r => { r.wall.patternScale = parseFloat(e.target.value); }, 'wallsc:' + room.id));
-  root.querySelector('[data-wall-mirror]').addEventListener('click', () => upd(r => { r.wall.patternMirror = !r.wall.patternMirror; }));
-  root.querySelector('[data-wall-upload]').addEventListener('change', (e) => uploadPattern(e.target.files[0], room.id, 'wall'));
+  // P3: 벽 스타일 변경 대상. 정면뷰 = 해당 벽면(오버라이드 생성/수정), 평면도 = 룸 일괄 + 개별 면 제거.
+  const wallT = (r) => {
+    if (!faceMode) { delete r.wallFaces; return r.wall; }
+    r.wallFaces = r.wallFaces || {};
+    if (!r.wallFaces[wallDir]) r.wallFaces[wallDir] = JSON.parse(JSON.stringify(r.wall));
+    return r.wallFaces[wallDir];
+  };
+  const co = (k) => k + ':' + room.id + (faceMode ? ':' + wallDir : '');
+
+  root.querySelector('[data-wall-color]').addEventListener('input', e => { updQuiet(r => { wallT(r).color = e.target.value; }, co('wallcolor')); root.querySelector('[data-wall-hex]').value = e.target.value; });
+  root.querySelector('[data-wall-hex]').addEventListener('change', e => { const v = e.target.value.trim(); if (/^#[0-9a-fA-F]{6}$/.test(v)) upd(r => { wallT(r).color = v; }); });
+  root.querySelectorAll('[data-wall-quick]').forEach(el => el.addEventListener('click', () => upd(r => { wallT(r).color = el.dataset.wallQuick; })));
+  root.querySelector('[data-wall-pattern]').addEventListener('change', e => upd(r => { wallT(r).pattern = e.target.value; }));
+  root.querySelector('[data-wall-op]').addEventListener('input', e => updQuiet(r => { wallT(r).patternOpacity = parseFloat(e.target.value); }, co('wallop')));
+  root.querySelector('[data-wall-scale]').addEventListener('input', e => updQuiet(r => { wallT(r).patternScale = parseFloat(e.target.value); }, co('wallsc')));
+  root.querySelector('[data-wall-mirror]').addEventListener('click', () => upd(r => { const t = wallT(r); t.patternMirror = !t.patternMirror; }));
+  root.querySelector('[data-wall-upload]').addEventListener('change', (e) => uploadPattern(e.target.files[0], room.id, 'wall', faceMode ? wallDir : null));
+  root.querySelector('[data-face-reset]')?.addEventListener('click', () => upd(r => {
+    if (r.wallFaces) { delete r.wallFaces[wallDir]; if (!Object.keys(r.wallFaces).length) delete r.wallFaces; }
+  }));
   root.querySelectorAll('[data-floor]').forEach(el => el.addEventListener('click', () => {
     if (el.dataset.floor === 'custom' && !room.floor.asset) return;
     upd(r => { r.floor.preset = el.dataset.floor; if (el.dataset.floor === 'custom') { r.floor.scale = r.floor.scale || 1; } });
@@ -244,7 +367,8 @@ function renderAtmosphere() {
 }
 
 // 커스텀 패턴 업로드 (P5): 1024px WebP 최적화 → IndexedDB → wall/floor 필드 연결
-async function uploadPattern(file, roomId, kind) {
+// faceDir (P3): 정면뷰에서 업로드 시 해당 벽면 오버라이드에만 적용
+async function uploadPattern(file, roomId, kind, faceDir = null) {
   if (!file) return;
   try {
     const { processImageFile } = await import('./libraryPanel.js');
@@ -254,7 +378,15 @@ async function uploadPattern(file, roomId, kind) {
     store.mutate(p => {
       const r = roomId === '__lobby__' ? p.lobby : p.rooms.find(x => x.id === roomId);
       if (!r) return;
-      if (kind === 'wall') { r.wall.pattern = 'custom'; r.wall.patternAsset = id; r.wall.patternScale = r.wall.patternScale || 1; }
+      if (kind === 'wall') {
+        let t = r.wall;
+        if (faceDir) {
+          r.wallFaces = r.wallFaces || {};
+          if (!r.wallFaces[faceDir]) r.wallFaces[faceDir] = JSON.parse(JSON.stringify(r.wall));
+          t = r.wallFaces[faceDir];
+        } else delete r.wallFaces;
+        t.pattern = 'custom'; t.patternAsset = id; t.patternScale = t.patternScale || 1;
+      }
       else { r.floor.preset = 'custom'; r.floor.asset = id; r.floor.scale = r.floor.scale || 1; }
     }, { detail: {} });
     renderAtmosphere();
@@ -280,9 +412,17 @@ function bindStrip() {
   $('#btn-add-room').addEventListener('click', () => {
     if (store.project.rooms.length >= RANGES.rooms[1]) { toast(`룸은 최대 ${RANGES.rooms[1]}개입니다.`, true); return; }
     store.mutate(p => {
+      // P2 자유 배치: 마지막 룸 주변 빈 자리(북→동→서→남)에 자동 배치 + 맞닿는 벽 중앙에 문 자동 설정
+      const layout = computeLayout(p);
       const prev = p.rooms[p.rooms.length - 1];
-      if (prev && !prev.exitDoor) prev.exitDoor = { wall: 'north', offset: prev.size.w / 2 };
-      p.rooms.push(makeRoom({ name: `${p.rooms.length + 1}. 새 섹션`, exitDoor: null }, p.rooms.length));
+      const prevRect = layout.rooms[layout.rooms.length - 1]?.rect;
+      const size = { w: 12, d: 9 };
+      const origin = findFreeSpot(layout, prevRect, size);
+      if (prev && !prev.exitDoor && prevRect) {
+        prev.exitDoor = sharedDoor(prevRect, { xMin: origin.x, xMax: origin.x + size.w, zMin: origin.z, zMax: origin.z + size.d })
+          || { wall: 'north', offset: +(wallLength(prevRect, 'north') / 2).toFixed(2) };
+      }
+      p.rooms.push(makeRoom({ name: `${p.rooms.length + 1}. 새 섹션`, exitDoor: null, origin }, p.rooms.length));
     }, { detail: {} });
     store.select({ roomId: store.project.rooms[store.project.rooms.length - 1].id });
   });
@@ -334,10 +474,49 @@ function reorderRoom(from, to) {
 // ---- 키보드 ----
 function bindKeys() {
   window.addEventListener('keydown', (e) => {
-    if (e.target.matches('input,textarea')) return;
+    if (e.target?.matches?.('input,textarea')) return;
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? store.redo() : store.undo(); }
     else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') { e.preventDefault(); store.redo(); }
+    else if (e.key === 'Escape') {
+      // P2: ESC = 정면뷰 → 평면도 복귀 / 평면도 → 선택 해제
+      if (mode === 'elevation') setMode('plan');
+      else if (store.selection.roomId) store.select({ roomId: null, artworkId: null, wall: null, textId: null });
+    }
   });
+}
+
+// ---- P2: 새 룸 자동 배치 헬퍼 ----
+// 기준 룸의 북/동/서/남 순으로 겹치지 않는 자리 탐색. 실패 시 전체 동쪽.
+function findFreeSpot(layout, baseRect, size) {
+  const rects = [layout.lobby, ...layout.rooms.map(r => r.rect)];
+  const base = baseRect || layout.lobby;
+  const cx = (base.xMin + base.xMax) / 2, cz = (base.zMin + base.zMax) / 2;
+  const cands = [
+    { x: cx - size.w / 2, z: base.zMin - size.d },   // 북
+    { x: base.xMax, z: cz - size.d / 2 },            // 동
+    { x: base.xMin - size.w, z: cz - size.d / 2 },   // 서
+    { x: cx - size.w / 2, z: base.zMax },            // 남
+  ];
+  const overlaps = (o) => rects.some(R =>
+    Math.min(o.x + size.w, R.xMax) - Math.max(o.x, R.xMin) > 1e-6 &&
+    Math.min(o.z + size.d, R.zMax) - Math.max(o.z, R.zMin) > 1e-6);
+  for (const c of cands) {
+    const o = { x: +c.x.toFixed(2), z: +c.z.toFixed(2) };
+    if (!overlaps(o)) return o;
+  }
+  return { x: +(layout.bounds.xMax + 2).toFixed(2), z: +(-size.d).toFixed(2) };
+}
+
+// 두 rect 가 맞닿은 변 → 기준 룸(A)의 문 {wall, offset = 공유 스팬 중앙} (wallLeftToWorld 규약)
+function sharedDoor(A, B) {
+  const EPS = 1e-3;
+  const xlo = Math.max(A.xMin, B.xMin), xhi = Math.min(A.xMax, B.xMax);
+  const zlo = Math.max(A.zMin, B.zMin), zhi = Math.min(A.zMax, B.zMax);
+  if (Math.abs(B.zMax - A.zMin) < EPS && xhi - xlo >= LAYOUT.DOOR_W) return { wall: 'north', offset: +((xlo + xhi) / 2 - A.xMin).toFixed(2) };
+  if (Math.abs(B.zMin - A.zMax) < EPS && xhi - xlo >= LAYOUT.DOOR_W) return { wall: 'south', offset: +(A.xMax - (xlo + xhi) / 2).toFixed(2) };
+  if (Math.abs(B.xMin - A.xMax) < EPS && zhi - zlo >= LAYOUT.DOOR_W) return { wall: 'east', offset: +((zlo + zhi) / 2 - A.zMin).toFixed(2) };
+  if (Math.abs(B.xMax - A.xMin) < EPS && zhi - zlo >= LAYOUT.DOOR_W) return { wall: 'west', offset: +(A.zMax - (zlo + zhi) / 2).toFixed(2) };
+  return null;
 }
 
 // ---- 유틸 ----

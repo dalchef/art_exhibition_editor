@@ -14,6 +14,16 @@
   src: url('../../vendor/noto-serif-kr/NotoSerifKR-700.woff2') format('woff2');
   font-weight: 700; font-display: swap;
 }
+@font-face {
+  font-family: 'Noto Sans KR';
+  src: url('../../vendor/noto-sans-kr/NotoSansKR-400.woff2') format('woff2');
+  font-weight: 400; font-display: swap;
+}
+@font-face {
+  font-family: 'Noto Sans KR';
+  src: url('../../vendor/noto-sans-kr/NotoSansKR-700.woff2') format('woff2');
+  font-weight: 700; font-display: swap;
+}
 * { margin: 0; padding: 0; box-sizing: border-box; }
 :root {
   --bg: #1b1e24; --panel: #232830; --panel2: #2b313b; --line: #363d48;
@@ -102,8 +112,25 @@ input, select, textarea { font-family: inherit; }
 .switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: .15s; }
 .switch.on::after { left: 20px; }
 
-/* 작업영역 */
-#workarea { grid-row: 2; grid-column: 2; display: flex; flex-direction: column; background: #14171c; position: relative; }
+/* 작업영역 — P1 스플릿: 편집 뷰 | 디바이더 | 3D 라이브 프리뷰 */
+#workarea { grid-row: 2; grid-column: 2; display: flex; background: #14171c; position: relative; min-width: 0; }
+#edit-pane { flex: 1 1 auto; min-width: 240px; display: flex; flex-direction: column; position: relative; overflow: hidden; }
+#split-divider { flex: 0 0 9px; background: var(--line); cursor: col-resize; position: relative; z-index: 5; transition: background .15s; }
+#split-divider:hover { background: var(--accent2); }
+#btn-preview-toggle {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  width: 20px; height: 58px; padding: 0; font-size: 10px; line-height: 1;
+  background: var(--panel2); color: var(--ink2); border: 1px solid var(--line); border-radius: 6px;
+}
+#btn-preview-toggle:hover { color: var(--ink); border-color: var(--accent); }
+#preview-pane { flex: 0 0 42%; min-width: 200px; display: flex; flex-direction: column; background: #0e1013; overflow: hidden; }
+#preview-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--line); background: var(--panel); }
+#preview-head .pv-title { font-size: 12px; font-weight: 700; color: var(--ink2); letter-spacing: .05em; text-transform: uppercase; }
+#preview-head .pv-hint { font-size: 11px; color: #6f7987; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#preview-frame { flex: 1; width: 100%; border: 0; display: block; background: #14100e; }
+#workarea.preview-collapsed #preview-pane { display: none; }
+#workarea.preview-collapsed #split-divider { cursor: default; }
+#workarea.split-dragging #preview-frame { pointer-events: none; }
 .mode-switch { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--line); background: var(--panel); }
 .mode-btn { background: var(--panel2); border: 1px solid var(--line); color: var(--ink2); padding: 7px 16px; border-radius: 7px; font-weight: 600; font-size: 13px; }
 .mode-btn.on { color: var(--ink); border-color: var(--accent); background: #34302340; }
@@ -124,10 +151,28 @@ input, select, textarea { font-family: inherit; }
 .add-room { flex: 0 0 auto; height: 78px; padding: 0 18px; border: 1.5px dashed var(--line); background: transparent; color: var(--ink2); border-radius: 10px; font-weight: 700; }
 .add-room:hover { border-color: var(--accent); color: var(--ink); }
 
+/* P3: 정면뷰 면 소속 바 — canvas-host 상단 중앙 */
+#face-bar { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; z-index: 10; background: rgba(35,40,48,.92); border: 1px solid var(--line); border-radius: 8px; padding: 7px 12px; box-shadow: 0 4px 14px rgba(0,0,0,.35); white-space: nowrap; }
+#face-bar .fb-id { font-size: 12px; color: var(--ink2); }
+#face-bar .fb-id b { color: var(--ink); }
+#face-bar .fb-flip { background: var(--panel2); color: var(--accent2); border: 1px solid var(--line); border-radius: 6px; padding: 5px 10px; font-size: 12px; font-weight: 600; }
+#face-bar .fb-flip:hover { border-color: var(--accent2); color: #cfe2f4; }
+#face-bar .fb-ext { font-size: 11px; color: #6f7987; }
+#face-bar .fb-addtext { background: var(--panel2); color: var(--accent); border: 1px solid var(--line); border-radius: 6px; padding: 5px 10px; font-size: 12px; font-weight: 700; }
+#face-bar .fb-addtext:hover { border-color: var(--accent); }
+
 /* 정면뷰 선택 툴바 (복제/삭제) — canvas-host 기준 절대배치 */
 .elev-toolbar { position: absolute; transform: translateX(-50%); display: flex; gap: 6px; z-index: 10; }
 .elev-toolbar button { background: var(--panel2); color: var(--ink); border: 1px solid var(--line); border-radius: 7px; padding: 6px 12px; font-size: 12px; font-weight: 600; box-shadow: 0 4px 14px rgba(0,0,0,.4); }
 .elev-toolbar button:hover { border-color: var(--accent); color: #f0e3c4; }
+
+/* P8: 에디터 공용 모달 (복구 확인 · Publish 배포 URL) */
+.ed-modal { position: fixed; inset: 0; z-index: 500; display: flex; align-items: center; justify-content: center; background: rgba(10,12,16,.6); backdrop-filter: blur(3px); }
+.ed-card { width: min(440px, 92vw); background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 22px 24px; box-shadow: 0 18px 60px rgba(0,0,0,.5); }
+.ed-title { font-size: 16px; font-weight: 800; color: #f0e3c4; margin-bottom: 10px; }
+.ed-body { font-size: 13px; color: var(--ink2); line-height: 1.6; margin-bottom: 14px; }
+.ed-input { width: 100%; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; color: var(--ink); padding: 10px 12px; font-size: 13px; margin-bottom: 14px; }
+.ed-actions { display: flex; justify-content: flex-end; gap: 8px; }
 
 /* 토스트 */
 #toast { position: fixed; bottom: 118px; left: 50%; transform: translateX(-50%); background: #2b313b; color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 10px 18px; font-size: 13px; opacity: 0; transition: opacity .25s; pointer-events: none; z-index: 999; box-shadow: 0 8px 30px rgba(0,0,0,.4); }

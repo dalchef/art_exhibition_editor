@@ -42,14 +42,26 @@
     </div>
   </aside>
 
-  <!-- 중앙 작업영역 -->
+  <!-- 중앙 작업영역: 편집 뷰 | 스플릿 디바이더 | 3D 라이브 프리뷰 (P1) -->
   <main id="workarea">
-    <div class="mode-switch">
-      <button class="mode-btn on" data-mode="plan">평면도</button>
-      <button class="mode-btn" data-mode="elevation">정면뷰</button>
-      <span class="mode-hint" id="mode-hint"></span>
+    <div id="edit-pane">
+      <div class="mode-switch">
+        <button class="mode-btn on" data-mode="plan">평면도</button>
+        <button class="mode-btn" data-mode="elevation">정면뷰</button>
+        <span class="mode-hint" id="mode-hint"></span>
+      </div>
+      <div id="canvas-host"></div>
     </div>
-    <div id="canvas-host"></div>
+    <div id="split-divider" title="드래그로 비율 조절">
+      <button id="btn-preview-toggle" title="3D 프리뷰 접기/펼치기">▶</button>
+    </div>
+    <div id="preview-pane">
+      <div id="preview-head">
+        <span class="pv-title">3D 라이브 프리뷰</span>
+        <span class="pv-hint">클릭 후 WASD 이동 · 드래그 시점</span>
+      </div>
+      <iframe id="preview-frame" title="3D 라이브 프리뷰" allow="fullscreen"></iframe>
+    </div>
   </main>
 
   <!-- 우측 패널: Space & Atmosphere -->

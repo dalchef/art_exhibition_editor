@@ -1,6 +1,6 @@
 // editor/js/state.js
 // 프로젝트 모델 + 자동저장(IndexedDB) + undo/redo + 이미지 Blob 저장 + 프로젝트 zip 입출력.
-import { makeProject, makeRoom, makeArtwork, validateProject, ensureLobby, ensureTextStyles, normalizeSurfaces, SCHEMA_VERSION } from '../../shared/schema.js';
+import { makeProject, makeRoom, makeArtwork, validateProject, ensureLobby, ensureTextStyles, normalizeSurfaces, ensureOrigins, ensureTexts, SCHEMA_VERSION } from '../../shared/schema.js';
 
 const DB_NAME = 'museum-maker';
 const DB_VER = 1;
@@ -51,6 +51,7 @@ export class ProjectStore extends EventTarget {
   async init() {
     this.db = await openDB();
     const saved = await idbGet(this.db, STORE_KV, 'project');
+    this.restoredFromSave = !!saved; // P8-2: 재진입 복구 다이얼로그 트리거
     if (saved) {
       this.project = saved;
       // v1.0 아바타 필드 마이그레이션 (a1~a4 / hairColor·topColor → preset·body·garment)
@@ -71,6 +72,8 @@ export class ProjectStore extends EventTarget {
     ensureLobby(this.project);        // P3: lobby 필드 부재 시 기본값 생성 (구 프로젝트 호환)
     ensureTextStyles(this.project);   // P4: 텍스트월 스타일 기본값
     normalizeSurfaces(this.project);  // P5: 벽 색/패턴 필드 정규화 (구 프리셋 → 색 매핑)
+    ensureOrigins(this.project);      // P2: 문 체인 배치 → 자유 배치(origin) 마이그레이션
+    ensureTexts(this.project);        // P4: 고정 타이틀월/섹션 패널 → 자유 배치 텍스트 오브젝트
     if (!this.selection.roomId && this.project.rooms[0]) this.selection.roomId = this.project.rooms[0].id;
     this.emit('load');
     return this;
@@ -172,8 +175,9 @@ export class ProjectStore extends EventTarget {
     if (this.selection.roomId === '__lobby__') {
       const lb = ensureLobby(this.project);
       return { id: '__lobby__', isLobby: true, name: '로비', intro: '',
-               size: lb.size, wall: lb.wall, floor: lb.floor, lighting: lb.lighting,
-               decor: lb.decor, exitDoor: null, artworks: lb.artworks };
+               size: lb.size, wall: lb.wall, wallFaces: lb.wallFaces, floor: lb.floor,
+               lighting: lb.lighting, decor: lb.decor, exitDoor: null, artworks: lb.artworks,
+               texts: lb.texts };
     }
     return this.project.rooms.find(r => r.id === this.selection.roomId) || null;
   }
@@ -195,6 +199,7 @@ export class ProjectStore extends EventTarget {
     const scan = (r) => {
       if (r?.wall?.patternAsset) ids.add(r.wall.patternAsset);
       if (r?.floor?.asset) ids.add(r.floor.asset);
+      for (const f of Object.values(r?.wallFaces || {})) if (f?.patternAsset) ids.add(f.patternAsset); // P3
     };
     for (const r of this.project.rooms) scan(r);
     scan(this.project.lobby);
@@ -230,8 +235,9 @@ export class ProjectStore extends EventTarget {
       holder[field] = `assets/patterns/${id}.${ext}`;
       zip.file(holder[field], im.blob);
     };
-    for (const r of proj.rooms) { packPattern(r.wall, 'patternAsset'); packPattern(r.floor, 'asset'); }
-    if (proj.lobby) { packPattern(proj.lobby.wall, 'patternAsset'); packPattern(proj.lobby.floor, 'asset'); }
+    const packFaces = (r) => { for (const f of Object.values(r?.wallFaces || {})) packPattern(f, 'patternAsset'); }; // P3
+    for (const r of proj.rooms) { packPattern(r.wall, 'patternAsset'); packPattern(r.floor, 'asset'); packFaces(r); }
+    if (proj.lobby) { packPattern(proj.lobby.wall, 'patternAsset'); packPattern(proj.lobby.floor, 'asset'); packFaces(proj.lobby); }
     zip.file('museum.json', JSON.stringify(proj, null, 2));
     zip.file('_projectfile.txt', '이 zip 은 미술관 메이커의 "작업 파일"입니다. Publish 배포본과 다릅니다.\n에디터에서 [프로젝트 불러오기]로 다시 열 수 있습니다.');
     return await zip.generateAsync({ type: 'blob' });
@@ -269,8 +275,9 @@ export class ProjectStore extends EventTarget {
       newImages.set(id, { blob: blob.slice(0, blob.size, type), thumbBlob: blob.slice(0, blob.size, type) });
       holder[field] = id;
     };
-    for (const r of project.rooms) { await unpackPattern(r.wall, 'patternAsset'); await unpackPattern(r.floor, 'asset'); }
-    if (project.lobby) { await unpackPattern(project.lobby.wall, 'patternAsset'); await unpackPattern(project.lobby.floor, 'asset'); }
+    const unpackFaces = async (r) => { for (const f of Object.values(r?.wallFaces || {})) await unpackPattern(f, 'patternAsset'); }; // P3
+    for (const r of project.rooms) { await unpackPattern(r.wall, 'patternAsset'); await unpackPattern(r.floor, 'asset'); await unpackFaces(r); }
+    if (project.lobby) { await unpackPattern(project.lobby.wall, 'patternAsset'); await unpackPattern(project.lobby.floor, 'asset'); await unpackFaces(project.lobby); }
     // 기존 이미지 정리
     for (const [id, im] of this.images) { URL.revokeObjectURL(im.url); URL.revokeObjectURL(im.thumbUrl); await idbDel(this.db, STORE_IMG, id); }
     this.images.clear();
@@ -280,7 +287,33 @@ export class ProjectStore extends EventTarget {
     ensureLobby(this.project);
     ensureTextStyles(this.project);
     normalizeSurfaces(this.project);
+    ensureOrigins(this.project);
+    ensureTexts(this.project);
     this.selection = { roomId: project.rooms[0]?.id || null, artworkId: null, wall: null };
+    this._undo.length = 0; this._redo.length = 0;
+    await this.save();
+    this.emit('load');
+    this.emit('change');
+  }
+
+  // P8-2: 새 프로젝트로 초기화 (자동 저장본 폐기 — 복구 다이얼로그의 "새로 시작")
+  async resetProject() {
+    for (const [id, im] of this.images) {
+      URL.revokeObjectURL(im.url); URL.revokeObjectURL(im.thumbUrl);
+      await idbDel(this.db, STORE_IMG, id);
+    }
+    this.images.clear();
+    this.project = makeProject({ meta: { slug: 'my-museum', title: '새 미술관' } });
+    if (this.project.rooms.length < 2) {
+      this.project.rooms.push(makeRoom({ name: '2. 두 번째 섹션', exitDoor: null }, 1));
+      this.project.rooms[0].exitDoor = { wall: 'north', offset: this.project.rooms[0].size.w / 2 };
+    }
+    ensureLobby(this.project);
+    ensureTextStyles(this.project);
+    normalizeSurfaces(this.project);
+    ensureOrigins(this.project);
+    ensureTexts(this.project);
+    this.selection = { roomId: this.project.rooms[0].id, artworkId: null, wall: null, textId: null };
     this._undo.length = 0; this._redo.length = 0;
     await this.save();
     this.emit('load');

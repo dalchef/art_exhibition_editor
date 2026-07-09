@@ -3,7 +3,7 @@
 let _win = null;
 let _wired = false;
 
-function buildPayload(store) {
+export function buildPayload(store) {
   // 프리뷰용 프로젝트 사본: 이미지 경로 = 작품 id, blobs 로 실제 URL 전달.
   // docentNote 는 프리뷰에서 유지(§6.8).
   const proj = JSON.parse(JSON.stringify(store.project));
@@ -54,7 +54,7 @@ export function openPreview(store) {
     store.on('change', () => {
       if (!_win || _win.closed) return;
       clearTimeout(t);
-      t = setTimeout(send, 350);
+      t = setTimeout(send, 300);
     });
     // 3D 편집(P2) 역방향: preview → editor. 에디터 상태가 단일 소스 — undo 1스텝 후 재전송됨.
     window.addEventListener('message', (e) => {

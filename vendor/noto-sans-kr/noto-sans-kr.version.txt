@@ -1,0 +1,6 @@
+Noto Sans KR — korean subset woff2, weights 400/700
+Vendored from fontsource CDN 2026-07-08:
+  https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-kr@5.2.5/files/noto-sans-kr-korean-400-normal.woff2
+  https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-kr@5.2.5/files/noto-sans-kr-korean-700-normal.woff2
+License: SIL Open Font License 1.1
+Source: https://fonts.google.com/noto/specimen/Noto+Sans+KR (© Google)

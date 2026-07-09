@@ -6,7 +6,7 @@
 //   vendor/three*, pretendard woff2   (jszip 제외)
 //   data/museum.json     (docentNote 제거)  + data/assets/{artworks,thumbs}/*
 //   NOTICE.md, README.md
-export async function exportPublishZip(store) {
+export async function exportPublishZip(store, opts = {}) {
   const JSZip = window.JSZip;
   const zip = new JSZip();
   const slug = (store.project.meta.slug || 'museum').replace(/[^a-z0-9-]/gi, '-').toLowerCase();
@@ -27,8 +27,8 @@ export async function exportPublishZip(store) {
   // 2) 데이터 + 에셋 (data/ 하위에 배치 → 뷰어 baseDir 로직과 일치)
   const proj = JSON.parse(JSON.stringify(store.project));
   delete proj._library;
-  let coverThumb = '';
   const firstId = (proj.route && proj.route[0]) || null;
+  const thumbPaths = new Map();
   const packArt = (a) => {
     delete a.docentNote;          // §4: 배포본에서 반드시 제거
     delete a._px;
@@ -40,11 +40,14 @@ export async function exportPublishZip(store) {
       a.thumb = `assets/thumbs/${a.id}.${ext}`;
       base.file(`data/${a.image}`, im.blob);
       base.file(`data/${a.thumb}`, im.thumbBlob || im.blob);
-      if (a.id === firstId || !coverThumb) coverThumb = `data/${a.thumb}`;
+      thumbPaths.set(a.id, `data/${a.thumb}`);
     }
   };
   for (const r of proj.rooms) for (const a of (r.artworks || [])) packArt(a);
   for (const a of (proj.lobby?.artworks || [])) packArt(a);  // P3 로비 포스터
+  // P8-4: og:image = 에디터 지정 대표 작품 → 관람 순서 첫 작품 → 아무거나 폴백
+  const coverThumb = thumbPaths.get(proj.meta.coverId) || thumbPaths.get(firstId)
+    || thumbPaths.values().next().value || '';
 
   // 커스텀 패턴 (P5): assets/patterns/ 로 포함 + 경로 재작성
   const packPattern = (holder, field) => {
@@ -57,14 +60,15 @@ export async function exportPublishZip(store) {
     holder[field] = path;
     base.file(`data/${path}`, im.blob);
   };
-  for (const r of proj.rooms) { packPattern(r.wall, 'patternAsset'); packPattern(r.floor, 'asset'); }
-  if (proj.lobby) { packPattern(proj.lobby.wall, 'patternAsset'); packPattern(proj.lobby.floor, 'asset'); }
+  const packFaces = (r) => { for (const f of Object.values(r?.wallFaces || {})) packPattern(f, 'patternAsset'); }; // P3
+  for (const r of proj.rooms) { packPattern(r.wall, 'patternAsset'); packPattern(r.floor, 'asset'); packFaces(r); }
+  if (proj.lobby) { packPattern(proj.lobby.wall, 'patternAsset'); packPattern(proj.lobby.floor, 'asset'); packFaces(proj.lobby); }
 
   base.file('data/museum.json', JSON.stringify(proj, null, 2));
 
   // 3) 루트 index.html (viewer/index.html 이식 + 경로 재작성 + OG 메타)
   const viewerHtml = await (await fetch('../viewer/index.html')).text();
-  base.file('index.html', buildIndexHtml(viewerHtml, proj.meta, coverThumb));
+  base.file('index.html', buildIndexHtml(viewerHtml, proj.meta, coverThumb, opts.baseUrl || ''));
 
   // 4) 배포 README (한국어)
   base.file('README.md', deployReadme(proj.meta, slug));
@@ -74,15 +78,20 @@ export async function exportPublishZip(store) {
   return blob;
 }
 
-function buildIndexHtml(html, meta, coverThumb) {
+// P8-4: baseUrl(배포 예정 URL) 입력 시 og:image/og:url 을 절대 URL 로 생성.
+// 미입력 시 상대 경로 유지 (공유 카드 이미지 제한 — Publish 다이얼로그에서 안내).
+function buildIndexHtml(html, meta, coverThumb, baseUrl = '') {
+  const abs = (p) => baseUrl ? baseUrl.replace(/\/+$/, '') + '/' + p : p;
+  const title = (meta.title || '온라인 미술관').replace(/\n/g, ' ');
   const og = `
   <meta property="og:type" content="website">
-  <meta property="og:title" content="${escAttr(meta.title || '온라인 미술관')}">
-  <meta property="og:description" content="${escAttr((meta.intro || meta.subtitle || '').slice(0, 120))}">
-  ${coverThumb ? `<meta property="og:image" content="${coverThumb}">` : ''}
+  <meta property="og:title" content="${escAttr(title)}">
+  <meta property="og:description" content="${escAttr(((meta.intro || meta.subtitle || '').replace(/\n/g, ' ') || '온라인 3D 미술관 전시').slice(0, 120))}">
+  ${baseUrl ? `<meta property="og:url" content="${escAttr(baseUrl)}">` : ''}
+  ${coverThumb ? `<meta property="og:image" content="${escAttr(abs(coverThumb))}">` : ''}
   <meta name="twitter:card" content="summary_large_image">`;
   return html
-    .replace('<title>온라인 미술관</title>', `<title>${escHtml(meta.title || '온라인 미술관')}</title>${og}`)
+    .replace('<title>온라인 미술관</title>', `<title>${escHtml(title)}</title>${og}`)
     .replace('href="css/viewer.css"', 'href="viewer/css/viewer.css"')
     .replace('src="js/main.js"', 'src="viewer/js/main.js"');
 }

@@ -25,7 +25,9 @@
     "vendor/three.core.js",
     "vendor/pretendard/PretendardVariable.woff2",
     "vendor/noto-serif-kr/NotoSerifKR-400.woff2",
-    "vendor/noto-serif-kr/NotoSerifKR-700.woff2"
+    "vendor/noto-serif-kr/NotoSerifKR-700.woff2",
+    "vendor/noto-sans-kr/NotoSansKR-400.woff2",
+    "vendor/noto-sans-kr/NotoSansKR-700.woff2"
   ],
   "root": [
     "NOTICE.md"
